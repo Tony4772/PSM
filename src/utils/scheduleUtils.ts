@@ -102,7 +102,7 @@ export function getStoreStatusInfo(
   if (config.scheduleMode === 'manual_closed') {
     return {
       isOpen: false,
-      statusBadge: 'Cerrado',
+      statusBadge: 'Cerrado Ahora',
       statusDetail: 'Cerrado temporalmente por administración',
       todayScheduleText: 'Cerrado temporalmente',
       isSpecialDate: false,
@@ -129,7 +129,7 @@ export function getStoreStatusInfo(
     if (todaySpecial.isClosed) {
       return {
         isOpen: false,
-        statusBadge: 'Cerrado Hoy',
+        statusBadge: 'Cerrado Ahora',
         statusDetail: `Cerrado por: ${todaySpecial.note}`,
         todayScheduleText: `Cerrado por ${todaySpecial.note}`,
         isSpecialDate: true,
@@ -166,7 +166,7 @@ export function getStoreStatusInfo(
       } else if (currentMinutes < openMin) {
         return {
           isOpen: false,
-          statusBadge: 'Cerrado Actualmente',
+          statusBadge: 'Cerrado Ahora',
           statusDetail: `Abre hoy a las ${formatTime12h(todaySpecial.openTime)} (${todaySpecial.note})`,
           todayScheduleText: todayText,
           isSpecialDate: true,
@@ -176,7 +176,7 @@ export function getStoreStatusInfo(
       } else {
         return {
           isOpen: false,
-          statusBadge: 'Cerrado por Hoy',
+          statusBadge: 'Cerrado Ahora',
           statusDetail: `Horario especial finalizado`,
           todayScheduleText: todayText,
           isSpecialDate: true,
@@ -225,7 +225,7 @@ export function getStoreStatusInfo(
 
     return {
       isOpen: false,
-      statusBadge: 'Cerrado Hoy',
+      statusBadge: 'Cerrado Ahora',
       statusDetail: todayConfig ? `Descanso los ${todayConfig.dayName}` : 'Cerrado hoy',
       todayScheduleText: todayConfig ? `Hoy (${todayConfig.dayName}): Cerrado` : 'Cerrado',
       isSpecialDate: false,
@@ -259,7 +259,7 @@ export function getStoreStatusInfo(
   } else if (currentMinutes < openMin) {
     return {
       isOpen: false,
-      statusBadge: 'Cerrado Actualmente',
+      statusBadge: 'Cerrado Ahora',
       statusDetail: `Abre hoy a las ${formatTime12h(todayConfig.openTime)}`,
       todayScheduleText: todayScheduleFormatted,
       isSpecialDate: false,
@@ -275,7 +275,7 @@ export function getStoreStatusInfo(
 
     return {
       isOpen: false,
-      statusBadge: 'Cerrado por Hoy',
+      statusBadge: 'Cerrado Ahora',
       statusDetail: tomorrowMsg,
       todayScheduleText: todayScheduleFormatted,
       isSpecialDate: false,

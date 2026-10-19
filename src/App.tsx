@@ -32,7 +32,7 @@ export default function App() {
   const [fulfillmentMode, setFulfillmentMode] = useState<FulfillmentMode>('delivery');
   const [selectedZoneId, setSelectedZoneId] = useState<string>('san-miguel');
   const [activeCategory, setActiveCategory] = useState<string>('tradicionales');
-  const [cartItems, setCartItems] = useState<CartItem[]>(INITIAL_CART_ITEMS);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [comprobante, setComprobante] = useState<ComprobanteType>('boleta');
   const [facturaDetails, setFacturaDetails] = useState<FacturaDetails>({
     ruc: '',
@@ -343,45 +343,6 @@ export default function App() {
       setHasActiveOrder(true);
       setCurrentView('tracking');
       window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      // Format comanda message for WhatsApp
-      let waMessage = `🥟 *NUEVO PEDIDO: ${generatedNumber}*\n`;
-      waMessage += `*Cliente:* ${customerName} (${customerPhone})\n`;
-      waMessage += `*Modalidad:* ${
-        fulfillmentMode === 'delivery'
-          ? `Delivery a ${deliveryAddress} [Distrito: ${currentZone?.name}] (Ref: ${deliveryReference})`
-          : `Recojo en Dark Kitchen (${storeConfig.address})`
-      }\n`;
-      waMessage += `\n*PRODUCTOS:*\n`;
-      cartItems.forEach((it) => {
-        waMessage += `• ${it.quantity}x ${it.name} (${it.portionLabel || 'Estándar'}) = S/ ${(it.price * it.quantity).toFixed(2)}\n`;
-      });
-      waMessage += `\n*Subtotal:* S/ ${cartSubtotal.toFixed(2)}\n`;
-      waMessage += `*Costo de Envío:* ${
-        fulfillmentMode === 'delivery'
-          ? isFreeDelivery
-            ? '¡GRATIS! (Por compras mayores a S/ ' + freeThreshold.toFixed(0) + ')'
-            : `S/ ${deliveryFee.toFixed(2)} [${currentZone?.name}]`
-          : 'S/ 0.00 (Recojo en Local)'
-      }\n`;
-      waMessage += `*TOTAL A PAGAR:* S/ ${cartTotal.toFixed(2)}\n`;
-      waMessage += `*Método de Pago:* ${paymentMethod.toUpperCase()}\n`;
-      if (paymentMethod === 'contra_entrega') {
-        waMessage += `*Paga con billete de:* S/ ${cashAmount}\n`;
-      }
-      waMessage += `*Comprobante:* ${comprobante.toUpperCase()}${comprobante === 'factura' ? ` (RUC: ${facturaDetails.ruc} - ${facturaDetails.razonSocial})` : ''}\n`;
-      if (orderNotes) {
-        waMessage += `*Notas:* ${orderNotes}\n`;
-      }
-
-      const waUrl = `https://wa.me/${storeConfig.whatsappPhone}?text=${encodeURIComponent(waMessage)}`;
-      const link = document.createElement('a');
-      link.href = waUrl;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
     }, 900);
   };
 
@@ -905,6 +866,13 @@ export default function App() {
         onResetToDefaults={handleResetToDefaults}
         currentPassword={adminPassword}
         onUpdatePassword={handleUpdatePassword}
+      />
+
+      {/* Schedule & Calendar Modal */}
+      <ScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        storeConfig={effectiveStoreConfig}
       />
 
       {/* Footer */}

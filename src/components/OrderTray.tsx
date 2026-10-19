@@ -54,24 +54,6 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
   const total = subtotal + deliveryFee;
   const totalItemsCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
-  // Generate WhatsApp order message URL
-  const generateWhatsAppLink = () => {
-    let text = `Hola Piqueos San Miguel, deseo confirmar mi pedido:\n`;
-    cartItems.forEach((item) => {
-      text += `• ${item.quantity}x ${item.name} (${item.portionLabel || 'Estándar'}) - S/ ${(
-        item.price * item.quantity
-      ).toFixed(2)}\n`;
-    });
-    text += `\nModalidad: ${
-      fulfillmentMode === 'delivery'
-        ? `Delivery a ${deliveryAddress} [Zona: ${currentZone?.name}] (${isFreeDeliveryQualified ? '¡Delivery GRATIS!' : `+S/ ${deliveryFee.toFixed(2)}`})`
-        : `Recojo en Dark Kitchen (${storeConfig?.address || 'Calle Moore 296, San Miguel'})`
-    }\n`;
-    text += `Comprobante: ${comprobante === 'factura' ? `Factura RUC ${facturaDetails.ruc}` : 'Boleta'}\n`;
-    text += `Total a Pagar: S/ ${total.toFixed(2)}`;
-    return `https://wa.me/${storeConfig?.whatsappPhone || '51906591037'}?text=${encodeURIComponent(text)}`;
-  };
-
   return (
     <aside className="sticky top-[125px] flex flex-col gap-4">
       <div className="bg-white rounded-3xl border border-[#E4BEBA]/30 p-5 shadow-lg flex flex-col gap-4">
@@ -408,16 +390,6 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
             <span className="material-symbols-outlined text-[20px]">check_circle</span>
             Confirmar Pedido (S/ {total.toFixed(2)})
           </button>
-
-          <a
-            href={generateWhatsAppLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-full font-bold text-[13px] shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 text-center"
-          >
-            <span className="material-symbols-outlined text-[18px]">chat</span>
-            Enviar Pedido Directo por WhatsApp
-          </a>
         </div>
       </div>
     </aside>

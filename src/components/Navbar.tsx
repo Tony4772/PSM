@@ -134,19 +134,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </nav>
 
-        {/* Action Cluster: WhatsApp & Cart Button */}
+        {/* Action Cluster: Cart Button */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* WhatsApp Direct Order Button */}
-          <a
-            href={`https://wa.me/${storeConfig?.whatsappPhone || '51906591037'}?text=Hola%20Piqueos%20San%20Miguel,%20deseo%20hacer%20un%20pedido%20de%20teque%C3%B1os`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 bg-[#059669] hover:bg-[#047857] text-white px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full font-bold text-[12px] sm:text-[13px] shadow-xs active:scale-95 transition-all cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">chat</span>
-            <span className="hidden md:inline">Pedir por WhatsApp</span>
-            <span className="md:hidden">WhatsApp</span>
-          </a>
 
           {/* Cart Trigger Button */}
           <button

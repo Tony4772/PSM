@@ -50,7 +50,7 @@ export const TopAnnouncement: React.FC<TopAnnouncementProps> = ({
                 : 'bg-red-100 text-red-800'
             }`}
           >
-            {statusInfo.statusBadge}
+            {statusInfo.isOpen ? 'Abierto Ahora' : 'Cerrado Ahora'}
           </span>
         </div>
 
