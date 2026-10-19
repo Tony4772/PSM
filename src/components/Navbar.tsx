@@ -1,6 +1,6 @@
 import React from 'react';
 import { ASSETS } from '../data/menuData';
-import { FulfillmentMode } from '../types';
+import { FulfillmentMode, StoreConfig } from '../types';
 
 interface NavbarProps {
   fulfillmentMode: FulfillmentMode;
@@ -11,6 +11,9 @@ interface NavbarProps {
   onNavigateSection: (sectionId: string) => void;
   currentView: 'menu' | 'tracking';
   setCurrentView: (view: 'menu' | 'tracking') => void;
+  isAdminAuthenticated: boolean;
+  onOpenAdmin: () => void;
+  storeConfig?: StoreConfig;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -22,6 +25,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigateSection,
   currentView,
   setCurrentView,
+  isAdminAuthenticated,
+  onOpenAdmin,
+  storeConfig,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white shadow-xs border-b border-[#E4BEBA]/30 transition-all">
@@ -50,7 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="hidden md:flex items-center bg-[#F5F2FB] p-1 rounded-full border border-[#E4BEBA]/30">
           <button
             onClick={() => setFulfillmentMode('delivery')}
-            className={`px-3.5 py-1.5 rounded-full text-[13px] font-bold transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-full text-[13px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               fulfillmentMode === 'delivery'
                 ? 'bg-[#A20513] text-white shadow-xs'
                 : 'text-[#5B403D] hover:text-[#A20513]'
@@ -61,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
           <button
             onClick={() => setFulfillmentMode('pickup')}
-            className={`px-3.5 py-1.5 rounded-full text-[13px] font-bold transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-1.5 rounded-full text-[13px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
               fulfillmentMode === 'pickup'
                 ? 'bg-[#A20513] text-white shadow-xs'
                 : 'text-[#5B403D] hover:text-[#A20513]'
@@ -73,13 +79,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Desktop Nav Links */}
-        <nav className="hidden lg:flex items-center gap-5">
+        <nav className="hidden lg:flex items-center gap-6">
           <button
             onClick={() => {
               setCurrentView('menu');
               onNavigateSection('carta');
             }}
-            className={`font-bold pb-0.5 text-[14px] transition-colors ${
+            className={`font-bold pb-0.5 text-[14px] transition-colors cursor-pointer ${
               currentView === 'menu'
                 ? 'text-[#A20513] border-b-2 border-[#A20513]'
                 : 'text-[#5B403D] hover:text-[#A20513]'
@@ -92,7 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               setCurrentView('menu');
               onNavigateSection('combos');
             }}
-            className="text-[#5B403D] hover:text-[#A20513] transition-colors font-medium text-[14px]"
+            className="text-[#5B403D] hover:text-[#A20513] transition-colors font-medium text-[14px] cursor-pointer"
           >
             Combos
           </button>
@@ -101,7 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               setCurrentView('menu');
               onNavigateSection('salsas');
             }}
-            className="text-[#5B403D] hover:text-[#A20513] transition-colors font-medium text-[14px]"
+            className="text-[#5B403D] hover:text-[#A20513] transition-colors font-medium text-[14px] cursor-pointer"
           >
             Salsas
           </button>
@@ -110,20 +116,32 @@ export const Navbar: React.FC<NavbarProps> = ({
               setCurrentView('menu');
               onNavigateSection('nosotros');
             }}
-            className="text-[#5B403D] hover:text-[#A20513] transition-colors font-medium text-[14px]"
+            className="text-[#5B403D] hover:text-[#A20513] transition-colors font-medium text-[14px] cursor-pointer"
           >
             Nosotros
           </button>
+
+          {/* Only shown to owner if authenticated */}
+          {isAdminAuthenticated && (
+            <button
+              onClick={onOpenAdmin}
+              className="text-[#A20513] hover:text-[#C62828] transition-colors font-bold text-[13px] flex items-center gap-1 cursor-pointer bg-red-50 hover:bg-red-100 px-3 py-1 rounded-full border border-red-200"
+              title="Panel del Dueño"
+            >
+              <span className="material-symbols-outlined text-[16px]">tune</span>
+              Admin
+            </button>
+          )}
         </nav>
 
         {/* Action Cluster: WhatsApp & Cart Button */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* WhatsApp Direct Order Button */}
           <a
-            href="https://wa.me/51906591037?text=Hola%20Piqueos%20San%20Miguel,%20deseo%20hacer%20un%20pedido%20de%20teque%C3%B1os"
+            href={`https://wa.me/${storeConfig?.whatsappPhone || '51906591037'}?text=Hola%20Piqueos%20San%20Miguel,%20deseo%20hacer%20un%20pedido%20de%20teque%C3%B1os`}
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:inline-flex items-center gap-1.5 bg-[#059669] hover:bg-[#047857] text-white px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full font-bold text-[12px] sm:text-[13px] shadow-xs active:scale-95 transition-all"
+            className="hidden sm:inline-flex items-center gap-1.5 bg-[#059669] hover:bg-[#047857] text-white px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full font-bold text-[12px] sm:text-[13px] shadow-xs active:scale-95 transition-all cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">chat</span>
             <span className="hidden md:inline">Pedir por WhatsApp</span>

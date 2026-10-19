@@ -1,6 +1,15 @@
 import React from 'react';
+import { StoreConfig } from '../types';
 
-export const DarkKitchenSection: React.FC = () => {
+interface DarkKitchenSectionProps {
+  storeConfig?: StoreConfig;
+}
+
+export const DarkKitchenSection: React.FC<DarkKitchenSectionProps> = ({ storeConfig }) => {
+  const address = storeConfig?.address || 'Calle Comandante Guillermo Moore 296, San Miguel, Lima';
+  const addressRef = storeConfig?.addressRef || 'Altura Cdra 2 de Av. La Paz';
+  const mapsUrl = storeConfig?.mapsUrl || 'https://maps.google.com/?q=Comandante+Guillermo+Moore+296,+San+Miguel,+Lima';
+
   return (
     <section className="bg-[#F5F2FB] py-14 sm:py-16 border-t border-[#E4BEBA]/30" id="nosotros">
       <div className="max-w-7xl mx-auto px-4 lg:px-8">
@@ -57,7 +66,7 @@ export const DarkKitchenSection: React.FC = () => {
               <h3 className="text-[18px] font-bold text-[#1B1B21]">Zonas de Cobertura</h3>
               <p className="text-[13px] text-[#5B403D] mt-1.5 leading-relaxed">
                 Delivery ágil en San Miguel, Magdalena del Mar, Pueblo Libre, Jesús María, Bellavista
-                y La Perla. O retira directo sin costo en Calle Guillermo Moore 296.
+                y La Perla. O retira directo sin costo en {address}.
               </p>
             </div>
           </div>
@@ -74,14 +83,14 @@ export const DarkKitchenSection: React.FC = () => {
                 ¿Deseas recoger tu pedido en nuestra Dark Kitchen?
               </h4>
               <p className="text-[13px] text-[#5B403D] mt-0.5">
-                Calle Comandante Guillermo Moore 296, San Miguel (Ref. Altura Cdra 2 de Av. La Paz).
+                {address} (Ref. {addressRef}).
               </p>
             </div>
           </div>
 
           <a
             className="shrink-0 bg-[#EAE7EF] hover:bg-[#E4E1EA] text-[#1B1B21] font-bold text-[13px] px-5 py-3 rounded-full border border-[#E4BEBA]/40 flex items-center gap-2 transition-colors active:scale-95"
-            href="https://maps.google.com/?q=Comandante+Guillermo+Moore+296,+San+Miguel,+Lima"
+            href={mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
           >

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CartItem, ComprobanteType, FacturaDetails, FulfillmentMode } from '../types';
+import { CartItem, ComprobanteType, FacturaDetails, FulfillmentMode, StoreConfig } from '../types';
 
 interface OrderTrayProps {
   cartItems: CartItem[];
@@ -12,6 +12,9 @@ interface OrderTrayProps {
   facturaDetails: FacturaDetails;
   setFacturaDetails: React.Dispatch<React.SetStateAction<FacturaDetails>>;
   onConfirmOrder: () => void;
+  storeConfig?: StoreConfig;
+  selectedZoneId?: string;
+  onSelectZone?: (zoneId: string) => void;
 }
 
 export const OrderTray: React.FC<OrderTrayProps> = ({
@@ -25,12 +28,29 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
   facturaDetails,
   setFacturaDetails,
   onConfirmOrder,
+  storeConfig,
+  selectedZoneId = 'san-miguel',
+  onSelectZone,
 }) => {
   const [deliveryAddress, setDeliveryAddress] = useState('Av. La Paz 1420, Dpto 402, San Miguel');
   const [isEditingAddress, setIsEditingAddress] = useState(false);
 
+  const zones = storeConfig?.deliveryZones || [
+    { id: 'san-miguel', name: 'San Miguel (Zona Base)', fee: 5.00 },
+    { id: 'magdalena', name: 'Magdalena del Mar', fee: 6.50 },
+    { id: 'pueblo-libre', name: 'Pueblo Libre', fee: 6.50 },
+    { id: 'bellavista-laperla', name: 'Bellavista / La Perla (Callao)', fee: 7.50 },
+    { id: 'jesus-maria', name: 'Jesús María / Breña', fee: 8.50 },
+  ];
+
+  const currentZone = zones.find((z) => z.id === selectedZoneId) || zones[0];
   const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const deliveryFee = fulfillmentMode === 'delivery' ? 6.50 : 0.0;
+
+  const freeThreshold = storeConfig?.freeDeliveryThreshold ?? 60.0;
+  const isFreeDeliveryQualified = freeThreshold > 0 && subtotal >= freeThreshold;
+
+  const baseZoneFee = currentZone ? currentZone.fee : (storeConfig?.deliveryFee ?? 5.0);
+  const deliveryFee = fulfillmentMode === 'delivery' ? (isFreeDeliveryQualified ? 0.0 : baseZoneFee) : 0.0;
   const total = subtotal + deliveryFee;
   const totalItemsCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -44,12 +64,12 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
     });
     text += `\nModalidad: ${
       fulfillmentMode === 'delivery'
-        ? `Delivery a ${deliveryAddress} (+S/ 6.50)`
-        : 'Recojo en Dark Kitchen (Calle Moore 296, San Miguel)'
+        ? `Delivery a ${deliveryAddress} [Zona: ${currentZone?.name}] (${isFreeDeliveryQualified ? '¡Delivery GRATIS!' : `+S/ ${deliveryFee.toFixed(2)}`})`
+        : `Recojo en Dark Kitchen (${storeConfig?.address || 'Calle Moore 296, San Miguel'})`
     }\n`;
     text += `Comprobante: ${comprobante === 'factura' ? `Factura RUC ${facturaDetails.ruc}` : 'Boleta'}\n`;
     text += `Total a Pagar: S/ ${total.toFixed(2)}`;
-    return `https://wa.me/51906591037?text=${encodeURIComponent(text)}`;
+    return `https://wa.me/${storeConfig?.whatsappPhone || '51906591037'}?text=${encodeURIComponent(text)}`;
   };
 
   return (
@@ -68,8 +88,29 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
           </span>
         </div>
 
+        {/* Free Delivery Incentive Bar */}
+        {freeThreshold > 0 && fulfillmentMode === 'delivery' && (
+          <div className="p-2.5 bg-gradient-to-r from-[#F5F2FB] to-white rounded-2xl border border-[#6C45C0]/25 text-[12px] flex flex-col gap-1.5">
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-1 text-[#6C45C0]">
+                <span className="material-symbols-outlined text-[16px]">moped</span>
+                {isFreeDeliveryQualified ? '¡Delivery GRATIS conseguido!' : 'Envío GRATIS en pedidos desde S/ ' + freeThreshold.toFixed(0)}
+              </span>
+              <span className="text-[#A20513] font-black">
+                {isFreeDeliveryQualified ? 'S/ 0.00' : `Faltan S/ ${(freeThreshold - subtotal).toFixed(2)}`}
+              </span>
+            </div>
+            <div className="w-full bg-[#EAE7EF] h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-[#A20513] to-emerald-500 h-full rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, (subtotal / freeThreshold) * 100)}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
+
         {/* Fulfillment Toggle inside cart */}
-        <div className="bg-[#F5F2FB] p-1.5 rounded-2xl flex flex-col gap-1.5 border border-[#E4BEBA]/20">
+        <div className="bg-[#F5F2FB] p-1.5 rounded-2xl flex flex-col gap-2 border border-[#E4BEBA]/20">
           <div className="grid grid-cols-2 gap-1 text-center text-[12px]">
             <button
               type="button"
@@ -80,8 +121,8 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
                   : 'font-medium text-[#5B403D] hover:text-[#A20513]'
               }`}
             >
-              Recojo en Tienda
-              <span className="block text-[10px] text-emerald-600 font-bold">¡Gratis!</span>
+              Recojo en Local
+              <span className="block text-[10px] text-emerald-600 font-bold">¡Gratis! (S/ 0.00)</span>
             </button>
 
             <button
@@ -95,10 +136,31 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
             >
               Delivery Express
               <span className="block text-[10px] text-[#5B403D] font-normal">
-                San Miguel / Alrededores
+                {isFreeDeliveryQualified ? '¡Gratis por tu compra!' : `Desde S/ ${zones[0]?.fee.toFixed(2)}`}
               </span>
             </button>
           </div>
+
+          {/* Delivery Zone Selector if delivery is selected */}
+          {fulfillmentMode === 'delivery' && (
+            <div className="px-1 flex flex-col gap-1">
+              <label className="text-[11px] font-bold text-[#1B1B21] flex items-center justify-between">
+                <span>Distrito / Zona de Entrega:</span>
+                <span className="text-[10px] text-[#6C45C0] font-semibold">Tarifa variable</span>
+              </label>
+              <select
+                value={selectedZoneId}
+                onChange={(e) => onSelectZone && onSelectZone(e.target.value)}
+                className="w-full bg-white text-[12px] font-medium p-2 rounded-xl border border-[#E4BEBA] focus:outline-none focus:ring-1 focus:ring-[#A20513]"
+              >
+                {zones.map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.name} — {isFreeDeliveryQualified ? 'GRATIS (Supera umbral)' : `S/ ${zone.fee.toFixed(2)}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Address / Location Info banner */}
           <div className="p-2.5 bg-white rounded-xl border border-[#E4BEBA]/30 text-[12px] text-[#5B403D] flex items-start gap-2">
@@ -109,7 +171,7 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
                 </span>
                 <div>
                   <strong className="text-[#1B1B21] block font-bold">Dark Kitchen San Miguel:</strong>
-                  <span>Comandante Guillermo Moore 296, San Miguel (Listo en 15-20 min).</span>
+                  <span>{storeConfig?.address || 'Comandante Guillermo Moore 296, San Miguel'} (Listo en 15-20 min).</span>
                 </div>
               </>
             ) : (
@@ -119,11 +181,11 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
                 </span>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
-                    <strong className="text-[#1B1B21] block font-bold">Entrega a Domicilio:</strong>
+                    <strong className="text-[#1B1B21] block font-bold">Dirección de Entrega:</strong>
                     <button
                       type="button"
                       onClick={() => setIsEditingAddress(!isEditingAddress)}
-                      className="text-[10px] text-[#A20513] font-bold underline"
+                      className="text-[10px] text-[#A20513] font-bold underline cursor-pointer"
                     >
                       {isEditingAddress ? 'Guardar' : 'Cambiar'}
                     </button>
@@ -197,7 +259,7 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
                 <button
                   type="button"
                   onClick={() => onRemoveItem(item.id)}
-                  className="text-[#8F706C] hover:text-[#BA1A1A] p-1 transition-colors"
+                  className="text-[#8F706C] hover:text-[#BA1A1A] p-1 transition-colors cursor-pointer"
                   title="Eliminar ítem"
                 >
                   <span className="material-symbols-outlined text-[16px]">close</span>
@@ -292,11 +354,24 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
             <span className="font-bold text-emerald-600">Gratis (S/ 0.00)</span>
           </div>
 
-          <div className="flex justify-between text-[#5B403D]">
-            <span>Costo de Entrega:</span>
-            <span className="font-semibold text-[#1B1B21]">
-              {fulfillmentMode === 'pickup' ? 'S/ 0.00 (Recojo)' : 'S/ 6.50 (Express)'}
+          <div className="flex justify-between text-[#5B403D] items-center">
+            <span>
+              Costo de Entrega ({fulfillmentMode === 'pickup' ? 'Recojo' : currentZone?.name}):
             </span>
+            <div className="text-right">
+              {fulfillmentMode === 'pickup' ? (
+                <span className="font-bold text-emerald-600">S/ 0.00 (Recojo)</span>
+              ) : isFreeDeliveryQualified ? (
+                <span className="font-bold text-emerald-600">
+                  <span className="line-through text-gray-400 mr-1.5 text-[11px]">
+                    S/ {baseZoneFee.toFixed(2)}
+                  </span>
+                  ¡GRATIS!
+                </span>
+              ) : (
+                <span className="font-semibold text-[#1B1B21]">S/ {deliveryFee.toFixed(2)}</span>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-between text-[16px] font-extrabold text-[#1B1B21] pt-2 border-t border-[#E4BEBA]/30 items-baseline">
@@ -305,24 +380,16 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
           </div>
         </div>
 
-        {/* Culqi Trust Badge */}
+        {/* Payment Security Badge */}
         <div className="bg-[#F5F2FB] p-2.5 rounded-2xl border border-[#E4BEBA]/30 flex flex-col gap-2">
           <div className="flex items-center justify-between text-[11px]">
             <span className="font-bold text-[#1B1B21] flex items-center gap-1">
-              <span className="material-symbols-outlined text-[16px] text-emerald-600">lock</span>
-              Pago Seguro con Culqi
+              <span className="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
+              Medios de Pago Disponibles
             </span>
-            <span className="text-[10px] text-[#5B403D] bg-white px-1.5 py-0.5 rounded font-bold shadow-2xs">
-              SSL 256-Bit
+            <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">
+              Yape · Plin · POS · Efectivo
             </span>
-          </div>
-
-          <div className="flex items-center justify-between gap-1 text-[10px] font-extrabold text-[#5B403D] px-1">
-            <span className="bg-white px-2 py-1 rounded shadow-2xs text-[#1a1f71]">VISA</span>
-            <span className="bg-white px-2 py-1 rounded shadow-2xs text-[#eb001b]">Mastercard</span>
-            <span className="bg-white px-2 py-1 rounded shadow-2xs text-[#0079be]">Amex</span>
-            <span className="bg-white px-2 py-1 rounded shadow-2xs text-[#6e008a]">Yape</span>
-            <span className="bg-white px-2 py-1 rounded shadow-2xs text-[#00bfa5]">Plin</span>
           </div>
         </div>
 
@@ -349,7 +416,7 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-full font-bold text-[13px] shadow-xs active:scale-98 transition-all flex items-center justify-center gap-2 text-center"
           >
             <span className="material-symbols-outlined text-[18px]">chat</span>
-            Confirmar Directo por WhatsApp
+            Enviar Pedido Directo por WhatsApp
           </a>
         </div>
       </div>

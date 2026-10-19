@@ -3,6 +3,7 @@ import { ASSETS, MENU_ITEMS } from '../data/menuData';
 import { MenuItem, PortionOption } from '../types';
 
 interface MenuCatalogProps {
+  menuItems: MenuItem[];
   onAddToCart: (
     item: MenuItem,
     selectedPortion?: PortionOption,
@@ -10,14 +11,12 @@ interface MenuCatalogProps {
   ) => void;
 }
 
-export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onAddToCart }) => {
+export const MenuCatalog: React.FC<MenuCatalogProps> = ({
+  menuItems,
+  onAddToCart,
+}) => {
   // Store selected portion index for each item id with multiple portions
-  const [selectedPortions, setSelectedPortions] = useState<Record<string, number>>({
-    'tequenos-queso': 0,
-    'tequenos-lomo-saltado': 0,
-    'tequenos-aji-gallina': 0,
-    'tequenos-pollo-brasa': 0,
-  });
+  const [selectedPortions, setSelectedPortions] = useState<Record<string, number>>({});
 
   const handleSelectPortion = (itemId: string, index: number) => {
     setSelectedPortions((prev) => ({ ...prev, [itemId]: index }));
@@ -34,11 +33,12 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onAddToCart }) => {
     return activePortion ? activePortion.price : item.price;
   };
 
-  const tradicionales = MENU_ITEMS.filter((i) => i.category === 'tradicionales');
-  const especiales = MENU_ITEMS.filter((i) => i.category === 'especiales');
-  const superBox = MENU_ITEMS.find((i) => i.id === 'super-box-50')!;
-  const salsas = MENU_ITEMS.filter((i) => i.category === 'salsas');
-  const bebidas = MENU_ITEMS.filter((i) => i.category === 'bebidas');
+  const tradicionales = menuItems.filter((i) => i.category === 'tradicionales');
+  const especiales = menuItems.filter((i) => i.category === 'especiales');
+  const combos = menuItems.filter((i) => i.category === 'combos');
+  const salsas = menuItems.filter((i) => i.category === 'salsas');
+  const bebidas = menuItems.filter((i) => i.category === 'bebidas');
+
 
   return (
     <div className="flex flex-col gap-10 sm:gap-12" id="carta">
@@ -275,68 +275,72 @@ export const MenuCatalog: React.FC<MenuCatalogProps> = ({ onAddToCart }) => {
           </div>
         </div>
 
-        {/* Big Bento Promo Box Card */}
-        <div className="bg-gradient-to-r from-white to-[#F5F2FB] rounded-3xl border-2 border-[#A20513]/25 p-5 sm:p-6 shadow-md">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-            <div className="md:col-span-7 flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <span className="bg-[#A20513] text-white text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
-                  Caja Gigante
-                </span>
-                <span className="text-[#6C45C0] font-bold text-[13px] flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">group</span>
-                  Para 6 a 8 personas
-                </span>
-              </div>
+        {/* Dynamic Combos List */}
+        <div className="flex flex-col gap-6">
+          {combos.map((combo) => (
+            <div
+              key={combo.id}
+              className="bg-gradient-to-r from-white to-[#F5F2FB] rounded-3xl border-2 border-[#A20513]/25 p-5 sm:p-6 shadow-md"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                <div className="md:col-span-7 flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-[#A20513] text-white text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">
+                      {combo.badge || 'Caja Gigante'}
+                    </span>
+                    <span className="text-[#6C45C0] font-bold text-[13px] flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[16px]">group</span>
+                      {combo.unitLabel || 'Para compartir'}
+                    </span>
+                  </div>
 
-              <h3 className="text-[20px] sm:text-[22px] font-extrabold text-[#1B1B21]">
-                {superBox.name}
-              </h3>
+                  <h3 className="text-[20px] sm:text-[22px] font-extrabold text-[#1B1B21]">
+                    {combo.name}
+                  </h3>
 
-              <p className="text-[14px] text-[#5B403D] leading-relaxed">
-                La combinación estelar de la casa:{' '}
-                <strong className="text-[#1B1B21]">25 Tequeños de Queso</strong> +{' '}
-                <strong className="text-[#1B1B21]">15 de Lomo Saltado</strong> +{' '}
-                <strong className="text-[#1B1B21]">10 de Pollo a la Brasa</strong>. Viene acompañado
-                de 3 salsas grandes a elección en potes de 4oz.
-              </p>
+                  <p className="text-[14px] text-[#5B403D] leading-relaxed">
+                    {combo.description}
+                  </p>
 
-              <div className="flex flex-wrap gap-2 text-[11px] text-[#5B403D] font-medium">
-                <span className="bg-[#EAE7EF] px-2.5 py-1 rounded-full">✓ Guacamole grande</span>
-                <span className="bg-[#EAE7EF] px-2.5 py-1 rounded-full">✓ Huancaína casera</span>
-                <span className="bg-[#EAE7EF] px-2.5 py-1 rounded-full">✓ Ají pollero secreto</span>
-              </div>
+                  <div className="flex items-center gap-4 pt-2">
+                    <div className="flex flex-col">
+                      <span className="text-[22px] font-black text-[#A20513]">
+                        S/ {combo.price.toFixed(2)}
+                      </span>
+                    </div>
 
-              <div className="flex items-center gap-4 pt-2">
-                <div className="flex flex-col">
-                  <span className="text-[12px] line-through text-[#8F706C]">Normal: S/ 92.00</span>
-                  <span className="text-[22px] font-black text-[#A20513]">S/ 79.90</span>
+                    <button
+                      type="button"
+                      onClick={() => onAddToCart(combo)}
+                      className="bg-[#A20513] hover:bg-[#C62828] text-white px-5 sm:px-6 py-2.5 rounded-full font-bold text-[14px] shadow-md active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">add_shopping_cart</span>
+                      Agregar al Carrito
+                    </button>
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onAddToCart(superBox)}
-                  className="bg-[#A20513] hover:bg-[#C62828] text-white px-5 sm:px-6 py-2.5 rounded-full font-bold text-[14px] shadow-md active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[20px]">add_shopping_cart</span>
-                  Agregar Super Box
-                </button>
+                <div className="md:col-span-5">
+                  <div className="relative rounded-2xl overflow-hidden shadow-lg border border-[#E4BEBA]/30 bg-white">
+                    {combo.image ? (
+                      <img
+                        src={combo.image}
+                        alt={combo.name}
+                        className="w-full h-56 object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-56 bg-[#F5F2FB] flex items-center justify-center text-[#A20513]">
+                        <span className="material-symbols-outlined text-6xl">celebration</span>
+                      </div>
+                    )}
+                    <span className="absolute bottom-2 right-2 bg-[#303036]/80 text-[#F2EFF8] text-[11px] font-bold px-2.5 py-0.5 rounded backdrop-blur-xs">
+                      {combo.name}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div className="md:col-span-5">
-              <div className="relative rounded-2xl overflow-hidden shadow-lg border border-[#E4BEBA]/30 bg-white">
-                <img
-                  src={ASSETS.superBoxPromo}
-                  alt="Super Box 50 Tequeños"
-                  className="w-full h-56 object-cover"
-                />
-                <span className="absolute bottom-2 right-2 bg-[#303036]/80 text-[#F2EFF8] text-[11px] font-bold px-2.5 py-0.5 rounded backdrop-blur-xs">
-                  50 Tequeños Surtidos
-                </span>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 

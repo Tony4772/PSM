@@ -39,3 +39,32 @@ export interface FacturaDetails {
 }
 
 export type OrderStage = 1 | 2 | 3 | 4 | 5; // 1: Pagado, 2: Fritura, 3: Empaque, 4: En Camino, 5: Entregado
+
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  fee: number;
+}
+
+export interface StoreConfig {
+  scheduleText: string;
+  isOpen: boolean;
+  deliveryTimeEstimate: string;
+  deliveryFee: number;
+  freeDeliveryThreshold?: number; // e.g. 60 (orders >= 60 get free delivery)
+  deliveryZones: DeliveryZone[];
+  address: string;
+  addressRef: string;
+  mapsUrl: string;
+  whatsappPhone: string;
+  whatsappDisplay: string;
+  ruc: string;
+  razonSocial: string;
+  yapePhone: string;
+  heroTitle: string;
+  heroHighlight: string;
+  heroDescription: string;
+  heroImage: string;
+}
+
+

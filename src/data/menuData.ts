@@ -1,4 +1,4 @@
-import { MenuItem } from '../types';
+import { DeliveryZone, MenuItem, StoreConfig } from '../types';
 
 export const ASSETS = {
   logoFull: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDk48oJRJB-ScnP0X-F73roM1smdLpcQDpiJVbMty42N5FxaJoiWT-NzAO8oVbAFG-5k-pCYoQygKmBzvZL8QRz3jGgNvRLFjzdBjHBcJlwVT6nXTVa7hQ8kt5Xsnh59IaFOAlUYX2fKUXt3ctA6GAwjw8QuHSrxC-MxRSw5VYJzVWBuiUMb4xaY8KeKXHi3cimgloFqJ0chmc-PXIqHmWLOsuF_GPzA8RkDVKs5JiIFNTd6GnkIaUx_j3csgf_no7wXmc',
@@ -15,6 +15,36 @@ export const ASSETS = {
   chichaMorada: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDdHBtPTOZDHy4j6Z7JFxsBOsPbVYnCkGNqg6FOC9w9s4ke-DBcrepTgSlJ1HybFApNQm-uS1pHeLM6Ote-ahaz0UhCqH2pozMlY7E6RyWsBaifK-8IaEYN0fb-TCj4-QoZWqFtT8Uf77f_zfaGc4YdIuQy95DnO3KKjm_adgJjTM1PY3mMc9mfhVwMD4av0wtUi8j4wyEZ8UK1wulj_Jb_BFeQ3nWWcBSIccqj93wOj3YpZ9YI1ldkEg',
   driverCarlos: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBebrLivWBJolX7aIsuDbaowvoThx2BcORLFh9stl0zU_zzZtA-Y_IYPgp0I9iPhipb58eeXFK59cauALHtKjPI7z8qgM2acdyHBCM9WR38lbOxW2VHluwHiLZgvORTWWoLM2uv59WQMVJ8M2VLpSr3ovGABClSr9rVYBRJpFDo7ObG7oFy3-XltEuOu6OjwqKj5tBvk-suuukPdD3rf9_b38_FZWKYl8d745QEJ2qZ-HSDhJAlPpbhKw',
 };
+
+export const DEFAULT_DELIVERY_ZONES: DeliveryZone[] = [
+  { id: 'san-miguel', name: 'San Miguel (Zona Base / Cercana)', fee: 5.00 },
+  { id: 'magdalena', name: 'Magdalena del Mar', fee: 6.50 },
+  { id: 'pueblo-libre', name: 'Pueblo Libre', fee: 6.50 },
+  { id: 'bellavista-laperla', name: 'Bellavista / La Perla (Callao)', fee: 7.50 },
+  { id: 'jesus-maria', name: 'Jesús María / Breña', fee: 8.50 },
+];
+
+export const DEFAULT_STORE_CONFIG: StoreConfig = {
+  scheduleText: 'Mar a Dom: 4:30 PM - 11:30 PM',
+  isOpen: true,
+  deliveryTimeEstimate: '25 - 40 min',
+  deliveryFee: 5.00,
+  freeDeliveryThreshold: 60.00,
+  deliveryZones: DEFAULT_DELIVERY_ZONES,
+  address: 'Comandante Guillermo Moore 296, San Miguel, Lima',
+  addressRef: 'Altura Cdra 2 de Av. La Paz',
+  mapsUrl: 'https://maps.google.com/?q=Comandante+Guillermo+Moore+296,+San+Miguel,+Lima',
+  whatsappPhone: '51906591037',
+  whatsappDisplay: '+51 906 591 037',
+  ruc: '20608941201',
+  razonSocial: 'Piqueos San Miguel S.A.C.',
+  yapePhone: '906 591 037',
+  heroTitle: 'Los Mejores',
+  heroHighlight: 'Tequeños',
+  heroDescription: 'Masa wantán extra crocante, rellenos generosos al estilo criollo y guacamole cremoso de la casa. Nuestra Dark Kitchen en San Miguel entrega tus antojos al instante, calientes y dorados.',
+  heroImage: ASSETS.heroTequenos,
+};
+
 
 export const MENU_ITEMS: MenuItem[] = [
   // 1. Tequeños Tradicionales
