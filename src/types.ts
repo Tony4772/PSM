@@ -89,5 +89,24 @@ export interface StoreConfig {
   heroImage: string;
 }
 
+export interface SunatComprobanteResult {
+  tipoComprobante: string;
+  serieCorrelativo: string;
+  empresa: string;
+  rucEmisor: string;
+  direccionEmisor: string;
+  xml?: string;
+  hash?: string;
+  montoTotal?: number;
+  mode?: string;
+}
+
+export interface CulqiPaymentResult {
+  chargeId: string;
+  amount: number;
+  currency: string;
+  referenceCode?: string;
+}
+
 
 

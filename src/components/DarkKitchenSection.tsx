@@ -6,7 +6,7 @@ interface DarkKitchenSectionProps {
 }
 
 export const DarkKitchenSection: React.FC<DarkKitchenSectionProps> = ({ storeConfig }) => {
-  const address = storeConfig?.address || 'Calle Comandante Guillermo Moore 296, San Miguel, Lima';
+  const address = storeConfig?.address || 'Jr. Comandante Juan Guillermo Moore 296, San Miguel, Lima';
   const addressRef = storeConfig?.addressRef || 'Altura Cdra 2 de Av. La Paz';
   const mapsUrl = storeConfig?.mapsUrl || 'https://maps.google.com/?q=Comandante+Guillermo+Moore+296,+San+Miguel,+Lima';
 

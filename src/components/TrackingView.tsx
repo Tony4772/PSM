@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { ASSETS } from '../data/menuData';
-import { CartItem, ComprobanteType, FacturaDetails, FulfillmentMode, OrderStage, StoreConfig } from '../types';
+import {
+  CartItem,
+  ComprobanteType,
+  CulqiPaymentResult,
+  FacturaDetails,
+  FulfillmentMode,
+  OrderStage,
+  StoreConfig,
+  SunatComprobanteResult,
+} from '../types';
 
 interface TrackingViewProps {
   orderNumber: string;
@@ -18,6 +27,8 @@ interface TrackingViewProps {
   facturaDetails?: FacturaDetails;
   onBackToMenu: () => void;
   storeConfig?: StoreConfig;
+  sunatResult?: SunatComprobanteResult | null;
+  culqiResult?: CulqiPaymentResult | null;
 }
 
 const STAGES = [
@@ -73,6 +84,8 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
   facturaDetails,
   onBackToMenu,
   storeConfig,
+  sunatResult,
+  culqiResult,
 }) => {
   const [copied, setCopied] = useState(false);
   const currentStageInfo = STAGES[orderStage - 1] || STAGES[0];
@@ -86,10 +99,13 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
   }[orderStage];
 
   const paymentLabel = {
+    culqi: culqiResult?.chargeId
+      ? `Pasarela Culqi Pagado (Ref: ${culqiResult.chargeId})`
+      : 'Pasarela de Pagos Culqi (Tarjeta / Yape)',
+    tarjeta: 'Pasarela Culqi (Tarjeta de Débito / Crédito)',
     yape: 'Yape Oficial (906 591 037)',
     plin: 'Plin (906 591 037)',
     contra_entrega: 'Pago Contra Entrega (Efectivo / POS)',
-    tarjeta: 'Tarjeta de Crédito / Débito',
   }[paymentMethod] || paymentMethod;
 
   const handleCopyOrderNumber = () => {
