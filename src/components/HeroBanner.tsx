@@ -122,7 +122,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
                   <span className="material-symbols-outlined text-[20px]">verified_user</span>
                 </div>
                 <div>
-                  <h4 className="text-[13px] font-bold text-[#1B1B21]">Culqi & Yape</h4>
+                  <h4 className="text-[13px] font-bold text-[#1B1B21]">Yape & Plin</h4>
                   <p className="text-[11px] text-[#5B403D]">100% Pago Seguro</p>
                 </div>
               </div>

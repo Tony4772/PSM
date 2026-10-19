@@ -284,7 +284,7 @@ export default function App() {
   };
 
   const handleAddSuperBox = () => {
-    const combo = menuItems.find((i) => i.id === 'combo-super-box') || menuItems.find((i) => i.category === 'combos');
+    const combo = menuItems.find((i) => i.id === 'super-box-50') || menuItems.find((i) => i.category === 'combos');
     if (combo) {
       handleAddToCart(combo);
       setIsCartDrawerOpen(true);
@@ -425,6 +425,7 @@ export default function App() {
             fulfillmentMode={fulfillmentMode}
             cartItems={cartItems}
             cartTotal={cartTotal}
+            deliveryFee={deliveryFee}
             deliveryAddress={deliveryAddress}
             customerName={customerName}
             customerPhone={customerPhone}

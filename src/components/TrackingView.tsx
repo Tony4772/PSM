@@ -9,6 +9,7 @@ interface TrackingViewProps {
   fulfillmentMode: FulfillmentMode;
   cartItems: CartItem[];
   cartTotal: number;
+  deliveryFee?: number;
   deliveryAddress: string;
   customerName?: string;
   customerPhone?: string;
@@ -63,6 +64,7 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
   fulfillmentMode,
   cartItems,
   cartTotal,
+  deliveryFee,
   deliveryAddress,
   customerName = 'Cliente',
   customerPhone = '906 591 037',
@@ -485,8 +487,10 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
                 <span>Costo de Entrega:</span>
                 <span>
                   {fulfillmentMode === 'delivery'
-                    ? `S/ ${(storeConfig?.deliveryFee ?? 6.5).toFixed(2)}`
-                    : 'Gratis (Recojo)'}
+                    ? deliveryFee === 0
+                      ? '¡GRATIS! (Promoción)'
+                      : `S/ ${(deliveryFee ?? storeConfig?.deliveryFee ?? 5.0).toFixed(2)}`
+                    : 'Gratis (Recojo en Local)'}
                 </span>
               </div>
               <div className="flex justify-between font-bold text-[15px] text-[#1B1B21] pt-1 border-t border-[#E4BEBA]/20">
