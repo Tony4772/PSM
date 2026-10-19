@@ -90,6 +90,7 @@ export interface StoreConfig {
 }
 
 export interface SunatComprobanteResult {
+  success?: boolean;
   tipoComprobante: string;
   serieCorrelativo: string;
   empresa: string;
@@ -99,6 +100,8 @@ export interface SunatComprobanteResult {
   hash?: string;
   montoTotal?: number;
   mode?: string;
+  error?: string;
+  warning?: string;
 }
 
 export interface CulqiPaymentResult {
@@ -107,6 +110,5 @@ export interface CulqiPaymentResult {
   currency: string;
   referenceCode?: string;
 }
-
 
 

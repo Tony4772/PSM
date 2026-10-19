@@ -28,6 +28,7 @@ interface TrackingViewProps {
   onBackToMenu: () => void;
   storeConfig?: StoreConfig;
   sunatResult?: SunatComprobanteResult | null;
+  isIssuingInvoice?: boolean;
   culqiResult?: CulqiPaymentResult | null;
 }
 
@@ -79,12 +80,13 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
   deliveryAddress,
   customerName = 'Cliente',
   customerPhone = '906 591 037',
-  paymentMethod = 'yape',
+  paymentMethod = 'culqi',
   comprobante = 'boleta',
   facturaDetails,
   onBackToMenu,
   storeConfig,
   sunatResult,
+  isIssuingInvoice = false,
   culqiResult,
 }) => {
   const [copied, setCopied] = useState(false);
@@ -98,15 +100,9 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
     5: 'Entregado',
   }[orderStage];
 
-  const paymentLabel = {
-    culqi: culqiResult?.chargeId
-      ? `Pasarela Culqi Pagado (Ref: ${culqiResult.chargeId})`
-      : 'Pasarela de Pagos Culqi (Tarjeta / Yape)',
-    tarjeta: 'Pasarela Culqi (Tarjeta de Débito / Crédito)',
-    yape: 'Yape Oficial (906 591 037)',
-    plin: 'Plin (906 591 037)',
-    contra_entrega: 'Pago Contra Entrega (Efectivo / POS)',
-  }[paymentMethod] || paymentMethod;
+  const paymentLabel = culqiResult?.chargeId
+    ? `Pago aprobado por Culqi (Ref: ${culqiResult.chargeId})`
+    : `Pago por ${paymentMethod}`;
 
   const handleCopyOrderNumber = () => {
     navigator.clipboard.writeText(orderNumber);
@@ -479,6 +475,16 @@ export const TrackingView: React.FC<TrackingViewProps> = ({
                 {comprobante === 'factura' && facturaDetails?.ruc
                   ? `Factura RUC: ${facturaDetails.ruc} - ${facturaDetails.razonSocial}`
                   : 'Boleta de Venta Electrónica'}
+              </div>
+              <div>
+                <strong>Estado de emisión:</strong>{' '}
+                {isIssuingInvoice
+                  ? 'Enviando a APISPeru/SUNAT…'
+                  : sunatResult?.success
+                    ? `Aceptado por APISPeru/SUNAT (${sunatResult.serieCorrelativo})`
+                    : sunatResult
+                      ? `No emitido: ${sunatResult.error || sunatResult.warning || 'APISPeru/SUNAT no confirmó el comprobante.'}`
+                      : 'Pendiente de emisión'}
               </div>
             </div>
 

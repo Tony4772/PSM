@@ -20,16 +20,20 @@ export default async function handler(req: any, res: any) {
   try {
     const { token, amount, email, orderNumber, customerName, customerPhone } = req.body || {};
 
-    if (!token) {
+    if (typeof token !== 'string' || !token.trim()) {
       return res.status(400).json({ error: 'Token de Culqi requerido.' });
     }
 
-    if (!amount || amount <= 0) {
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       return res.status(400).json({ error: 'Monto a pagar inválido.' });
     }
 
-    const secretKey = process.env.CULQI_SECRET_KEY || 'sk_live_5Sc2O9AqIvnvJTqm';
-    const amountInCents = Math.round(Number(amount) * 100);
+    const secretKey = process.env.CULQI_SECRET_KEY;
+    if (!secretKey) {
+      return res.status(500).json({ success: false, error: 'CULQI_SECRET_KEY no está configurada.' });
+    }
+    const amountInCents = Math.round(numericAmount * 100);
 
     const chargePayload = {
       amount: amountInCents,

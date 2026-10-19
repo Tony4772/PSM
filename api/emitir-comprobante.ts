@@ -29,11 +29,45 @@ export default async function handler(req: any, res: any) {
       deliveryFee = 0,
     } = req.body || {};
 
-    const token =
-      process.env.APISPERU_TOKEN ||
-      'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1c2VybmFtZSI6Ikpvc2VBbnRvbmlvIiwiY29tcGFueSI6IjIwNjE0MTIxMDQyIiwiaWF0IjoxNzgwOTQzMDMyLCJleHAiOjgwODgxNDMwMzJ9.dEQToGeW0_1-7UHvHw9QZjPkwWPk24DG0eMwVliefJ3cCSf4Jh3UrHErQ5AbCLtfJNqA4fMI4nHmsaUlJMochpFgO2lcFkp3F-WDcOOEjh2ICcM0Zt7LgYbFk5A5TbGvr63AltMtnkENetZCjuHkWn9H11zaqhXGhKZ_u4BP_UqVUpR0LrVF1MuLunp7e_N3SC6Ts2QUwzSm28TJoVlGPg9IiQPTaLBDKAkt7YHTYZVtCrqr35mV5SAWga00u7uxdBZccC0VA5YxgB8SMfB1mxvzQQkN36XvtgB6RCNb_t7X-2qRjG-QtJZpOxhfse3VzH28WgJQLsN2KVHiEvL5-kcal2Y4Oj2JTAOIzV8LtDUC0XFz5yZ02s_bgIQkEWp84S7jbxjaeIvneoL-Ur7XnrMue8FG7r0HU4osb6bjQJSRnJuiInoK6QwXpn1UH3VhpmJx1GQNdCeRlStVpgZqYpmV-ycwrgiuXT17-YrgZ5974lSzqB4m2qhpSOp7koxpUnCrjHYfsqqiEb6B_Ovywk7DVUBDfuZG5aOyN00C_cbyIJYL1WHEYn1CZVBu505EWRooNRRkJDzx4uETE8JTz0P1gOY4XhUHsyRN7n-kfZesWOKpBlHiSPvzTfOtJfvSN3bg7YnNnWJ9WtZgafX_oALTb0PEcNWU4_LtAGmiwlI';
+    const token = process.env.APISPERU_TOKEN;
+    if (!token) {
+      return res.status(500).json({ success: false, error: 'APISPERU_TOKEN no está configurado.' });
+    }
+    if (comprobante !== 'boleta' && comprobante !== 'factura') {
+      return res.status(400).json({ success: false, error: 'Tipo de comprobante inválido.' });
+    }
 
-    const isFactura = comprobante === 'factura' && facturaDetails?.ruc;
+    const totalAmount = Number(total);
+    const numericDeliveryFee = Number(deliveryFee);
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0 || !Number.isFinite(numericDeliveryFee) || numericDeliveryFee < 0) {
+      return res.status(400).json({ success: false, error: 'Importe del comprobante inválido.' });
+    }
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+      return res.status(400).json({ success: false, error: 'El comprobante debe incluir al menos un producto.' });
+    }
+    if (
+      cartItems.some((item: any) =>
+        !Number.isFinite(Number(item.price)) || Number(item.price) < 0 ||
+        !Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0
+      )
+    ) {
+      return res.status(400).json({ success: false, error: 'Hay productos con precio o cantidad inválidos.' });
+    }
+    const calculatedTotal = cartItems.reduce(
+      (sum: number, item: any) => sum + Number(item.price) * Number(item.quantity),
+      numericDeliveryFee
+    );
+    if (Math.abs(calculatedTotal - totalAmount) > 0.02) {
+      return res.status(400).json({ success: false, error: 'El total no coincide con los productos y el envío.' });
+    }
+
+    const isFactura = comprobante === 'factura';
+    if (isFactura && (!/^\d{11}$/.test(String(facturaDetails?.ruc || '')) ||
+      !String(facturaDetails?.razonSocial || '').trim() ||
+      !String(facturaDetails?.direccionFiscal || '').trim())) {
+      return res.status(400).json({ success: false, error: 'RUC, razón social y dirección fiscal son obligatorios para emitir factura.' });
+    }
+
     const tipoDoc = isFactura ? '01' : '03'; // 01 Factura, 03 Boleta
     const serie = isFactura ? 'F001' : 'B001';
 
@@ -41,7 +75,6 @@ export default async function handler(req: any, res: any) {
     const correlativo = String(Math.floor(Date.now() % 1000000)).padStart(6, '0');
 
     // Desglose de IGV 18%
-    const totalAmount = Number(total) || 0;
     const totalImpuestos = Number((totalAmount * 0.18 / 1.18).toFixed(2));
     const mtoOperGravadas = Number((totalAmount - totalImpuestos).toFixed(2));
 
@@ -68,9 +101,9 @@ export default async function handler(req: any, res: any) {
       };
     });
 
-    if (deliveryFee > 0) {
-      const igvDel = Number((deliveryFee * 0.18 / 1.18).toFixed(2));
-      const valDel = Number((deliveryFee - igvDel).toFixed(2));
+    if (numericDeliveryFee > 0) {
+      const igvDel = Number((numericDeliveryFee * 0.18 / 1.18).toFixed(2));
+      const valDel = Number((numericDeliveryFee - igvDel).toFixed(2));
       details.push({
         tipAfeIgv: '10',
         codProducto: 'DELIVERY',
@@ -83,9 +116,24 @@ export default async function handler(req: any, res: any) {
         porcentajeIgv: 18,
         igv: igvDel,
         totalImpuestos: igvDel,
-        mtoPrecioUnitario: Number(deliveryFee),
+        mtoPrecioUnitario: numericDeliveryFee,
       });
     }
+
+    const dateParts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Lima',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date()).reduce((parts: Record<string, string>, part) => {
+      parts[part.type] = part.value;
+      return parts;
+    }, {});
+    const fechaEmision = `${dateParts.year}-${dateParts.month}-${dateParts.day}T${dateParts.hour}:${dateParts.minute}:${dateParts.second}-05:00`;
 
     const payload = {
       ublVersion: '2.1',
@@ -93,18 +141,18 @@ export default async function handler(req: any, res: any) {
       tipoDoc,
       serie,
       correlativo,
-      fechaEmision: new Date().toISOString().slice(0, 19) + '-05:00',
+      fechaEmision,
       formaPago: {
         moneda: 'PEN',
         tipo: 'Contado',
       },
       tipoMoneda: 'PEN',
       client: {
-        tipoDoc: isFactura ? '6' : '1',
-        numDoc: isFactura ? facturaDetails.ruc : (customerPhone.slice(0, 8) || '00000000'),
-        rznSocial: isFactura ? facturaDetails.razonSocial : customerName,
+        tipoDoc: isFactura ? '6' : '0',
+        numDoc: isFactura ? facturaDetails.ruc : '00000000',
+        rznSocial: isFactura ? facturaDetails.razonSocial : (customerName || 'CLIENTES VARIOS'),
         address: {
-          direccion: isFactura ? (facturaDetails.direccionFiscal || 'Lima') : 'San Miguel, Lima',
+          direccion: isFactura ? facturaDetails.direccionFiscal : 'Lima',
         },
       },
       company: {
@@ -146,19 +194,25 @@ export default async function handler(req: any, res: any) {
     });
 
     const data = await apisPeruResp.json();
-
-    if (!apisPeruResp.ok) {
-      console.warn('APISPeru no pudo validar en SUNAT, emitiendo comprobante local:', data);
-      return res.status(200).json({
-        success: true,
-        mode: 'local_certified',
-        tipoComprobante: isFactura ? 'Factura Electrónica' : 'Boleta de Venta Electrónica',
-        serieCorrelativo: `${serie}-${correlativo}`,
-        empresa: 'EBYZOM E.I.R.L.',
-        rucEmisor: '20614121042',
-        direccionEmisor: 'JR. COMANDANTE JUAN GUILLERMO MOORE 296, SAN MIGUEL, LIMA',
-        warning: data.error || data.message || 'Comprobante emitido y registrado en comanda local.',
-        montoTotal: totalAmount,
+    const sunatCode = data.sunatResponse?.cdrResponse?.codRespuesta;
+    const rejectedBySunat = sunatCode !== undefined && String(sunatCode) !== '0';
+    const hasOfficialReceiptData = Boolean(data.xml && data.hash && data.sunatResponse);
+    if (
+      !apisPeruResp.ok ||
+      data.success === false ||
+      data.sunatResponse?.success === false ||
+      rejectedBySunat ||
+      !hasOfficialReceiptData
+    ) {
+      const errorDetail =
+        data.error ||
+        data.message ||
+        data.sunatResponse?.cdrResponse?.descripcion ||
+        'APISPeru/SUNAT no confirmó la emisión del comprobante.';
+      return res.status(502).json({
+        success: false,
+        mode: 'sunat_rejected',
+        error: errorDetail,
       });
     }
 

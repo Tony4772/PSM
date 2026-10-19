@@ -55,7 +55,7 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
   const totalItemsCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
-    <aside className="sticky top-[125px] flex flex-col gap-4">
+    <aside className="flex flex-col gap-4">
       <div className="bg-white rounded-3xl border border-[#E4BEBA]/30 p-5 shadow-lg flex flex-col gap-4">
         {/* Header of Tray */}
         <div className="flex items-center justify-between pb-3 border-b border-[#E4BEBA]/20">

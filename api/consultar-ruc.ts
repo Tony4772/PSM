@@ -22,9 +22,10 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  const token =
-    process.env.APISPERU_TOKEN ||
-    'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJ1c2VybmFtZSI6Ikpvc2VBbnRvbmlvIiwiY29tcGFueSI6IjIwNjE0MTIxMDQyIiwiaWF0IjoxNzgwOTQzMDMyLCJleHAiOjgwODgxNDMwMzJ9.dEQToGeW0_1-7UHvHw9QZjPkwWPk24DG0eMwVliefJ3cCSf4Jh3UrHErQ5AbCLtfJNqA4fMI4nHmsaUlJMochpFgO2lcFkp3F-WDcOOEjh2ICcM0Zt7LgYbFk5A5TbGvr63AltMtnkENetZCjuHkWn9H11zaqhXGhKZ_u4BP_UqVUpR0LrVF1MuLunp7e_N3SC6Ts2QUwzSm28TJoVlGPg9IiQPTaLBDKAkt7YHTYZVtCrqr35mV5SAWga00u7uxdBZccC0VA5YxgB8SMfB1mxvzQQkN36XvtgB6RCNb_t7X-2qRjG-QtJZpOxhfse3VzH28WgJQLsN2KVHiEvL5-kcal2Y4Oj2JTAOIzV8LtDUC0XFz5yZ02s_bgIQkEWp84S7jbxjaeIvneoL-Ur7XnrMue8FG7r0HU4osb6bjQJSRnJuiInoK6QwXpn1UH3VhpmJx1GQNdCeRlStVpgZqYpmV-ycwrgiuXT17-YrgZ5974lSzqB4m2qhpSOp7koxpUnCrjHYfsqqiEb6B_Ovywk7DVUBDfuZG5aOyN00C_cbyIJYL1WHEYn1CZVBu505EWRooNRRkJDzx4uETE8JTz0P1gOY4XhUHsyRN7n-kfZesWOKpBlHiSPvzTfOtJfvSN3bg7YnNnWJ9WtZgafX_oALTb0PEcNWU4_LtAGmiwlI';
+  const token = process.env.APISPERU_TOKEN;
+  if (!token) {
+    return res.status(500).json({ success: false, error: 'APISPERU_TOKEN no está configurado.' });
+  }
 
   try {
     if (ruc && ruc.length === 11) {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AdminConfigModal } from './components/AdminConfigModal';
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { CategoryTabs } from './components/CategoryTabs';
@@ -14,12 +15,14 @@ import { ASSETS, DEFAULT_STORE_CONFIG, INITIAL_CART_ITEMS, MENU_ITEMS } from './
 import {
   CartItem,
   ComprobanteType,
+  CulqiPaymentResult,
   FacturaDetails,
   FulfillmentMode,
   MenuItem,
   OrderStage,
   PortionOption,
   StoreConfig,
+  SunatComprobanteResult,
 } from './types';
 import {
   DEFAULT_SPECIAL_DATES,
@@ -48,13 +51,14 @@ export default function App() {
   );
   const [deliveryReference, setDeliveryReference] = useState<string>('Edificio Las Torres, frente al parque');
   const [orderNotes, setOrderNotes] = useState<string>('');
-  const [cashAmount, setCashAmount] = useState<string>('100.00');
 
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState<boolean>(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'yape' | 'plin' | 'contra_entrega' | 'tarjeta'>('yape');
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+  const [culqiResult, setCulqiResult] = useState<CulqiPaymentResult | null>(null);
+  const [sunatResult, setSunatResult] = useState<SunatComprobanteResult | null>(null);
+  const [isIssuingInvoice, setIsIssuingInvoice] = useState<boolean>(false);
 
   // Owner Authentication & Admin Controls
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
@@ -308,10 +312,11 @@ export default function App() {
 
   const handleStartCheckout = () => {
     setCheckoutError(null);
+    setSunatResult(null);
     setIsCheckoutModalOpen(true);
   };
 
-  const handleConfirmProductionOrder = (e: React.FormEvent) => {
+  const handleConfirmProductionOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setCheckoutError(null);
 
@@ -325,26 +330,168 @@ export default function App() {
       return;
     }
 
-    if (comprobante === 'factura' && (!facturaDetails.ruc || facturaDetails.ruc.length !== 11)) {
-      setCheckoutError('Por favor ingresa un número de RUC válido de 11 dígitos para la Factura Electrónica.');
+    if (
+      comprobante === 'factura' &&
+      (!/^\d{11}$/.test(facturaDetails.ruc) || !facturaDetails.razonSocial.trim() || !facturaDetails.direccionFiscal.trim())
+    ) {
+      setCheckoutError('Para emitir factura, completa un RUC de 11 dígitos, la razón social y la dirección fiscal.');
       return;
     }
 
-    setIsProcessingPayment(true);
+    if (cartTotal <= 0) {
+      setCheckoutError('El monto del pedido debe ser mayor que cero.');
+      return;
+    }
 
-    setTimeout(() => {
+    const publicKey = import.meta.env.VITE_CULQI_PUBLIC_KEY;
+    const CulqiCheckout = (window as any).CulqiCheckout;
+    if (!publicKey || !CulqiCheckout) {
+      setCheckoutError('No se pudo iniciar Culqi. Verifica la llave pública y el script del checkout.');
+      return;
+    }
+
+    const generatedNumber = `PSM-${Math.floor(1000 + Math.random() * 9000)}`;
+    const canPayWithYape = cartTotal <= 2000;
+    const options = {
+      lang: 'es',
+      installments: false,
+      modal: true,
+      paymentMethods: {
+        tarjeta: true,
+        yape: canPayWithYape,
+        billetera: false,
+        bancaMovil: false,
+        agente: false,
+        cuotealo: false,
+      },
+      paymentMethodsSort: canPayWithYape ? ['tarjeta', 'yape'] : ['tarjeta'],
+    };
+    const appearance = {
+      buttonCardPayText: `Pagar S/ ${cartTotal.toFixed(2)}`,
+      defaultStyle: {
+        buttonBackground: '#A20513',
+        bannerColor: '#A20513',
+      },
+    };
+
+    try {
+      setIsProcessingPayment(true);
+      const orderResponse = await fetch('/api/culqi-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: cartTotal,
+          orderNumber: generatedNumber,
+          customerName,
+          customerPhone,
+        }),
+      });
+      const orderResult = await orderResponse.json();
+      if (!orderResponse.ok || !orderResult.orderId) {
+        throw new Error(orderResult.error || 'No se pudo preparar la orden de pago con Culqi.');
+      }
+
+      const settings = {
+        title: 'Piqueos San Miguel',
+        currency: 'PEN',
+        amount: Math.round(cartTotal * 100),
+        order: orderResult.orderId,
+      };
+      const checkout = new CulqiCheckout(publicKey, { settings, options, appearance });
+      checkout.culqi = async () => {
+        if (checkout.token?.id) {
+          const token = checkout.token;
+          checkout.close();
+          setIsProcessingPayment(true);
+          try {
+            const response = await fetch('/api/culqi-charge', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                token: token.id,
+                amount: cartTotal,
+                email: token.email,
+                orderNumber: generatedNumber,
+                customerName,
+                customerPhone,
+              }),
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+              throw new Error(result.error || 'Culqi no pudo procesar el pago.');
+            }
+
+            setCulqiResult(result);
+            setOrderNumber(generatedNumber);
+            setOrderStage(1);
+            setHasActiveOrder(true);
+            setIsCheckoutModalOpen(false);
+            setIsCartDrawerOpen(false);
+            setIsIssuingInvoice(true);
+            setCurrentView('tracking');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            try {
+              const invoiceResponse = await fetch('/api/emitir-comprobante', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderNumber: generatedNumber,
+                  comprobante,
+                  customerName,
+                  customerPhone,
+                  customerEmail: token.email || '',
+                  facturaDetails,
+                  cartItems,
+                  total: cartTotal,
+                  deliveryFee,
+                }),
+              });
+              const invoiceData = await invoiceResponse.json();
+              if (!invoiceResponse.ok || !invoiceData.success) {
+                throw new Error(invoiceData.error || invoiceData.warning || 'SUNAT no confirmó la emisión del comprobante.');
+              }
+              setSunatResult(invoiceData);
+            } catch (invoiceError) {
+              setSunatResult({
+                success: false,
+                tipoComprobante: comprobante === 'factura' ? 'Factura Electrónica' : 'Boleta Electrónica',
+                serieCorrelativo: '',
+                empresa: 'EBYZOM E.I.R.L.',
+                rucEmisor: '20614121042',
+                direccionEmisor: 'JR. COMANDANTE JUAN GUILLERMO MOORE 296, SAN MIGUEL, LIMA',
+                error: invoiceError instanceof Error ? invoiceError.message : 'No se pudo emitir el comprobante.',
+              });
+            } finally {
+              setIsIssuingInvoice(false);
+            }
+          } catch (error) {
+            setCheckoutError(error instanceof Error ? error.message : 'Error al procesar el pago con Culqi.');
+          } finally {
+            setIsProcessingPayment(false);
+          }
+        } else if (checkout.error) {
+          setCheckoutError(
+            checkout.error.user_message || checkout.error.message || 'Culqi no pudo generar el token de pago.'
+          );
+        }
+      };
+      checkout.open();
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : 'No se pudo abrir el checkout de Culqi.');
+    } finally {
       setIsProcessingPayment(false);
-      setIsCheckoutModalOpen(false);
-      setIsCartDrawerOpen(false);
-
-      const generatedNumber = `PSM-${Math.floor(1000 + Math.random() * 9000)}`;
-      setOrderNumber(generatedNumber);
-      setOrderStage(1);
-      setHasActiveOrder(true);
-      setCurrentView('tracking');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 900);
+    }
   };
+
+  useEffect(() => {
+    if (!isCheckoutModalOpen && !isCartDrawerOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isCheckoutModalOpen, isCartDrawerOpen]);
 
   const featuredItem = menuItems.find((i) => i.category === 'combos') || menuItems[0];
 
@@ -379,7 +526,7 @@ export default function App() {
 
       {currentView === 'tracking' ? (
         <main className="flex-1">
-          <TrackingView
+        <TrackingView
             orderNumber={orderNumber}
             orderStage={orderStage}
             setOrderStage={setOrderStage}
@@ -390,7 +537,10 @@ export default function App() {
             deliveryAddress={deliveryAddress}
             customerName={customerName}
             customerPhone={customerPhone}
-            paymentMethod={paymentMethod}
+            paymentMethod="culqi"
+            culqiResult={culqiResult}
+            sunatResult={sunatResult}
+            isIssuingInvoice={isIssuingInvoice}
             comprobante={comprobante}
             facturaDetails={facturaDetails}
             onBackToMenu={() => {
@@ -418,35 +568,10 @@ export default function App() {
             onSelectCategory={handleSelectCategory}
           />
 
-          {/* Catalog & Cart Desktop Grid */}
+          {/* Main Menu Catalog; the cart is opened only from the cart button */}
           <div className="max-w-7xl mx-auto px-4 lg:px-8 py-10 lg:py-12">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* Menu Catalog (8 Cols) */}
-              <div className="lg:col-span-8">
-                <MenuCatalog
-                  menuItems={menuItems}
-                  onAddToCart={handleAddToCart}
-                />
-              </div>
-
-              {/* Order Tray Desktop Sidebar (4 Cols) */}
-              <div className="hidden lg:block lg:col-span-4">
-                <OrderTray
-                  cartItems={cartItems}
-                  onUpdateQty={handleUpdateQty}
-                  onRemoveItem={handleRemoveItem}
-                  fulfillmentMode={fulfillmentMode}
-                  setFulfillmentMode={setFulfillmentMode}
-                  comprobante={comprobante}
-                  setComprobante={setComprobante}
-                  facturaDetails={facturaDetails}
-                  setFacturaDetails={setFacturaDetails}
-                  onConfirmOrder={handleStartCheckout}
-                  storeConfig={storeConfig}
-                  selectedZoneId={selectedZoneId}
-                  onSelectZone={setSelectedZoneId}
-                />
-              </div>
+            <div className="w-full">
+              <MenuCatalog menuItems={menuItems} onAddToCart={handleAddToCart} />
             </div>
           </div>
 
@@ -474,10 +599,18 @@ export default function App() {
         </div>
       )}
 
-      {/* Mobile & Drawer Cart Modal */}
-      {isCartDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs transition-opacity animate-fade-in">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-4 sm:p-6 overflow-y-auto custom-scroll relative">
+      {/* Tu Pedido Actual: diálogo modal, abierto desde el botón del carrito */}
+      {isCartDrawerOpen && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tu Pedido Actual"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsCartDrawerOpen(false);
+          }}
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 animate-fade-in"
+        >
+          <div className="w-full max-w-xl max-h-[92vh] bg-white rounded-3xl shadow-2xl flex flex-col p-4 sm:p-6 overflow-y-auto custom-scroll relative">
             <button
               onClick={() => setIsCartDrawerOpen(false)}
               className="absolute top-4 right-4 text-[#5B403D] hover:text-[#1B1B21] p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
@@ -486,7 +619,7 @@ export default function App() {
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
 
-            <div className="mt-6">
+            <div className="pt-9">
               <OrderTray
                 cartItems={cartItems}
                 onUpdateQty={handleUpdateQty}
@@ -507,16 +640,26 @@ export default function App() {
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Production Checkout Modal */}
-      {isCheckoutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
+      {isCheckoutModalOpen && createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="checkout-modal-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsCheckoutModalOpen(false);
+          }}
+          className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto"
+        >
           <div className="bg-white rounded-3xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-5 sm:p-7 shadow-2xl border border-[#E4BEBA]/40 relative flex flex-col gap-4 custom-scroll">
             <button
               onClick={() => setIsCheckoutModalOpen(false)}
               className="absolute top-4 right-4 text-[#5B403D] hover:text-[#1B1B21] p-1.5 rounded-full hover:bg-gray-100 cursor-pointer"
+              aria-label="Cerrar pedido"
             >
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
@@ -526,7 +669,7 @@ export default function App() {
                 <span className="material-symbols-outlined text-[24px]">shopping_cart_checkout</span>
               </div>
               <div>
-                <h3 className="text-[18px] font-extrabold text-[#1B1B21]">
+                <h3 id="checkout-modal-title" className="text-[18px] font-extrabold text-[#1B1B21]">
                   Confirmar Pedido de Tequeños
                 </h3>
                 <span className="text-[12px] text-[#5B403D] font-medium">
@@ -659,99 +802,21 @@ export default function App() {
                 )}
               </div>
 
-              {/* Sección 2: Método de Pago */}
+              {/* Sección 2: Pasarela de pago exclusiva */}
               <div className="flex flex-col gap-2 pt-2 border-t border-[#E4BEBA]/30">
                 <h4 className="text-[13px] font-bold text-[#1B1B21] flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-[17px] text-[#A20513]">payments</span>
-                  Método de Pago
+                  Pasarela de Pago
                 </h4>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('yape')}
-                    className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                      paymentMethod === 'yape'
-                        ? 'border-[#6C45C0] bg-[#F5F2FB] ring-2 ring-[#6C45C0]'
-                        : 'border-[#E4BEBA]/60 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-[12px] font-black text-[#6C45C0]">Yape</span>
-                    <span className="text-[10px] text-[#5B403D]">Inmediato</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('plin')}
-                    className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                      paymentMethod === 'plin'
-                        ? 'border-[#0099FF] bg-blue-50 ring-2 ring-[#0099FF]'
-                        : 'border-[#E4BEBA]/60 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-[12px] font-black text-[#0099FF]">Plin</span>
-                    <span className="text-[10px] text-[#5B403D]">Interbank/BBVA</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('contra_entrega')}
-                    className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                      paymentMethod === 'contra_entrega'
-                        ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-600'
-                        : 'border-[#E4BEBA]/60 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-[12px] font-black text-emerald-800">Efectivo</span>
-                    <span className="text-[10px] text-[#5B403D]">Contra Entrega</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('tarjeta')}
-                    className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                      paymentMethod === 'tarjeta'
-                        ? 'border-[#A20513] bg-red-50 ring-2 ring-[#A20513]'
-                        : 'border-[#E4BEBA]/60 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="text-[12px] font-black text-[#A20513]">Tarjeta</span>
-                    <span className="text-[10px] text-[#5B403D]">POS Móvil</span>
-                  </button>
-                </div>
-
-                {/* Info de Pago específico */}
-                {paymentMethod === 'yape' && (
-                  <div className="p-3 bg-[#F5F2FB] rounded-xl border border-[#6C45C0]/30 text-[11px] text-[#3A008B] flex items-center justify-between">
-                    <div>
-                      <span className="font-extrabold block">Número de Yape de la Dark Kitchen:</span>
-                      <span className="text-[13px] font-black text-[#1B1B21]">{storeConfig.yapePhone}</span>
-                      <span className="block text-[10px] text-gray-500">Titular: {storeConfig.razonSocial}</span>
-                    </div>
-                    <span className="bg-[#6C45C0] text-white px-2 py-1 rounded-lg font-bold text-[10px]">
-                      Enviar comprobante
+                <div className="flex items-center gap-3 rounded-2xl border border-[#A20513]/25 bg-red-50 p-3">
+                  <span className="material-symbols-outlined text-[24px] text-[#A20513]">verified_user</span>
+                  <div>
+                    <span className="block text-[13px] font-black text-[#A20513]">Pago seguro con Culqi</span>
+                    <span className="text-[11px] text-[#5B403D]">
+                      Elige tarjeta o Yape dentro del checkout de Culqi (Yape hasta S/ 2,000). El pedido se confirma cuando el pago sea aprobado.
                     </span>
                   </div>
-                )}
-
-                {paymentMethod === 'contra_entrega' && (
-                  <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] text-emerald-900 flex items-center gap-3">
-                    <span className="material-symbols-outlined text-[20px] text-emerald-700">payments</span>
-                    <div className="flex-1">
-                      <span className="font-bold block">¿Con cuánto efectivo pagarás? (Para llevar vuelto)</span>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="font-black">S/</span>
-                        <input
-                          type="number"
-                          step="10"
-                          value={cashAmount}
-                          onChange={(e) => setCashAmount(e.target.value)}
-                          className="bg-white p-1 rounded-lg border border-emerald-300 w-24 text-[12px] font-bold"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
 
               {/* Sección 3: Comprobante SUNAT */}
@@ -794,6 +859,9 @@ export default function App() {
                       </label>
                       <input
                         type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]{11}"
+                        required
                         maxLength={11}
                         value={facturaDetails.ruc}
                         onChange={(e) =>
@@ -809,6 +877,7 @@ export default function App() {
                       </label>
                       <input
                         type="text"
+                        required
                         value={facturaDetails.razonSocial}
                         onChange={(e) =>
                           setFacturaDetails({ ...facturaDetails, razonSocial: e.target.value })
@@ -817,11 +886,26 @@ export default function App() {
                         className="w-full text-[11px] p-2 bg-white rounded-lg border border-[#E4BEBA]"
                       />
                     </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold text-[#5B403D] mb-1">
+                        Dirección Fiscal:
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={facturaDetails.direccionFiscal}
+                        onChange={(e) =>
+                          setFacturaDetails({ ...facturaDetails, direccionFiscal: e.target.value })
+                        }
+                        placeholder="Dirección registrada de la empresa"
+                        className="w-full text-[11px] p-2 bg-white rounded-lg border border-[#E4BEBA]"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Botón de Enviar a Cocina */}
+              {/* El pedido se registra únicamente después de que Culqi apruebe el pago */}
               <button
                 type="submit"
                 disabled={isProcessingPayment}
@@ -832,18 +916,19 @@ export default function App() {
                     <span className="material-symbols-outlined text-[20px] animate-spin">
                       progress_activity
                     </span>
-                    Registrando comanda en cocina...
+                    Procesando pago con Culqi...
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                    Confirmar Pedido (S/ {cartTotal.toFixed(2)}) y Enviar a Cocina
+                    <span className="material-symbols-outlined text-[20px]">payments</span>
+                    Pagar con Culqi (S/ {cartTotal.toFixed(2)})
                   </>
                 )}
               </button>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Admin Login Modal (Restricted to Owner) */}
