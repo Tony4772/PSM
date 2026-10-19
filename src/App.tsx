@@ -608,9 +608,9 @@ export default function App() {
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setIsCartDrawerOpen(false);
           }}
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 animate-fade-in"
+          className="fixed inset-0 z-[1000] flex justify-end bg-black/50 backdrop-blur-xs transition-opacity animate-fade-in"
         >
-          <div className="w-full max-w-xl max-h-[92vh] bg-white rounded-3xl shadow-2xl flex flex-col p-4 sm:p-6 overflow-y-auto custom-scroll relative">
+          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col p-4 sm:p-6 overflow-y-auto custom-scroll relative rounded-l-3xl">
             <button
               onClick={() => setIsCartDrawerOpen(false)}
               className="absolute top-4 right-4 text-[#5B403D] hover:text-[#1B1B21] p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
@@ -619,7 +619,7 @@ export default function App() {
               <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
 
-            <div className="pt-9">
+            <div className="mt-6">
               <OrderTray
                 cartItems={cartItems}
                 onUpdateQty={handleUpdateQty}
