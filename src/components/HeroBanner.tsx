@@ -1,5 +1,6 @@
 import React from 'react';
 import { MenuItem, StoreConfig } from '../types';
+import { getStoreStatusInfo } from '../utils/scheduleUtils';
 
 interface HeroBannerProps {
   storeConfig: StoreConfig;
@@ -7,6 +8,7 @@ interface HeroBannerProps {
   onQuickOrder: () => void;
   onAddSuperBox: () => void;
   featuredItem?: MenuItem;
+  onOpenSchedule?: () => void;
 }
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({
@@ -15,7 +17,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   onQuickOrder,
   onAddSuperBox,
   featuredItem,
+  onOpenSchedule,
 }) => {
+  const status = getStoreStatusInfo(storeConfig);
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-[#FBF8FF] via-[#F5F2FB] to-[#EAE7EF] py-10 lg:py-14 border-b border-[#E4BEBA]/30">
       {/* Ambient Lighting Blobs */}
@@ -26,29 +31,38 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
           {/* Left Text Content (7 Cols) */}
           <div className="lg:col-span-7 flex flex-col gap-4">
-            {/* Live Status Pill */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#E4BEBA]/40 shadow-xs w-fit">
+            {/* Live Status Pill with Schedule Click */}
+            <button
+              type="button"
+              onClick={onOpenSchedule}
+              className="inline-flex flex-wrap items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-[#E4BEBA]/40 shadow-xs w-fit hover:border-[#A20513]/40 cursor-pointer transition-all text-left group"
+              title="Haz clic para ver horarios detallados y feriados"
+            >
               <span className="relative flex h-2.5 w-2.5">
                 <span
                   className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                    storeConfig.isOpen ? 'bg-emerald-400' : 'bg-red-400'
+                    status.isOpen ? 'bg-emerald-400' : 'bg-red-400'
                   }`}
                 ></span>
                 <span
                   className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                    storeConfig.isOpen ? 'bg-emerald-500' : 'bg-red-500'
+                    status.isOpen ? 'bg-emerald-500' : 'bg-red-500'
                   }`}
                 ></span>
               </span>
               <span className="text-[13px] font-bold text-[#1B1B21]">
-                {storeConfig.isOpen ? 'Abierto Ahora' : 'Cerrado Actualmente'}
+                {status.statusBadge}
               </span>
               <span className="text-[#E4BEBA]">·</span>
-              <span className="text-[12px] text-[#5B403D] flex items-center gap-1 font-medium">
-                <span className="material-symbols-outlined text-[16px] text-[#925C00]">timer</span>
-                Entrega estimada: {storeConfig.deliveryTimeEstimate}
+              <span className="text-[12px] text-[#A20513] font-semibold">
+                {status.statusDetail}
               </span>
-            </div>
+              <span className="text-[#E4BEBA] hidden sm:inline">·</span>
+              <span className="text-[12px] text-[#5B403D] hidden sm:flex items-center gap-1 font-medium">
+                <span className="material-symbols-outlined text-[16px] text-[#925C00]">timer</span>
+                {storeConfig.deliveryTimeEstimate}
+              </span>
+            </button>
 
             {/* Main Punchy Title */}
             <h1 className="text-[28px] sm:text-[38px] lg:text-[46px] font-extrabold text-[#1B1B21] tracking-tight leading-[1.15]">

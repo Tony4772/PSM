@@ -7,6 +7,7 @@ import { HeroBanner } from './components/HeroBanner';
 import { MenuCatalog } from './components/MenuCatalog';
 import { Navbar } from './components/Navbar';
 import { OrderTray } from './components/OrderTray';
+import { ScheduleModal } from './components/ScheduleModal';
 import { TopAnnouncement } from './components/TopAnnouncement';
 import { TrackingView } from './components/TrackingView';
 import { ASSETS, DEFAULT_STORE_CONFIG, INITIAL_CART_ITEMS, MENU_ITEMS } from './data/menuData';
@@ -20,6 +21,11 @@ import {
   PortionOption,
   StoreConfig,
 } from './types';
+import {
+  DEFAULT_SPECIAL_DATES,
+  DEFAULT_WEEKLY_SCHEDULE,
+  getStoreStatusInfo,
+} from './utils/scheduleUtils';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<'menu' | 'tracking'>('menu');
@@ -64,6 +70,7 @@ export default function App() {
 
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState<boolean>(false);
   const [isAdminConfigModalOpen, setIsAdminConfigModalOpen] = useState<boolean>(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState<boolean>(false);
   const [adminPassword, setAdminPassword] = useState<string>(() => {
     try {
       return localStorage.getItem('psm_owner_password') || 'admin123';
@@ -91,12 +98,37 @@ export default function App() {
   const [storeConfig, setStoreConfig] = useState<StoreConfig>(() => {
     try {
       const saved = localStorage.getItem('psm_store_config');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...DEFAULT_STORE_CONFIG,
+          ...parsed,
+          weeklySchedule:
+            parsed.weeklySchedule && parsed.weeklySchedule.length === 7
+              ? parsed.weeklySchedule
+              : DEFAULT_WEEKLY_SCHEDULE,
+          specialDates: parsed.specialDates || DEFAULT_SPECIAL_DATES,
+          scheduleMode: parsed.scheduleMode || 'auto',
+        };
+      }
     } catch (e) {
       console.warn('Failed to load store config from storage', e);
     }
     return DEFAULT_STORE_CONFIG;
   });
+
+  // Clock to evaluate real-time schedule every 30 seconds
+  const [clock, setClock] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setClock(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const liveStoreStatus = getStoreStatusInfo(storeConfig, clock);
+  const effectiveStoreConfig: StoreConfig = {
+    ...storeConfig,
+    isOpen: liveStoreStatus.isOpen,
+  };
 
   // Owner shortcut listener (Alt + A) to open admin login quickly
   useEffect(() => {
@@ -363,9 +395,10 @@ export default function App() {
         setCurrentView={setCurrentView}
         orderNumber={orderNumber}
         hasActiveOrder={hasActiveOrder}
-        storeConfig={storeConfig}
+        storeConfig={effectiveStoreConfig}
         isAdminAuthenticated={isAdminAuthenticated}
         onOpenAdmin={handleOpenAdmin}
+        onOpenSchedule={() => setIsScheduleModalOpen(true)}
       />
 
       {/* Main Sticky Navbar */}
@@ -380,7 +413,7 @@ export default function App() {
         setCurrentView={setCurrentView}
         isAdminAuthenticated={isAdminAuthenticated}
         onOpenAdmin={handleOpenAdmin}
-        storeConfig={storeConfig}
+        storeConfig={effectiveStoreConfig}
       />
 
       {currentView === 'tracking' ? (
@@ -402,18 +435,19 @@ export default function App() {
               setCurrentView('menu');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            storeConfig={storeConfig}
+            storeConfig={effectiveStoreConfig}
           />
         </main>
       ) : (
         <main className="flex-1">
           {/* Hero Banner Section */}
           <HeroBanner
-            storeConfig={storeConfig}
+            storeConfig={effectiveStoreConfig}
             onScrollToMenu={handleScrollToMenu}
             onQuickOrder={() => setIsCartDrawerOpen(true)}
             onAddSuperBox={handleAddSuperBox}
             featuredItem={featuredItem}
+            onOpenSchedule={() => setIsScheduleModalOpen(true)}
           />
 
           {/* Sticky Category Tabs */}

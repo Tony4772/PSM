@@ -1,4 +1,5 @@
 import { DeliveryZone, MenuItem, StoreConfig } from '../types';
+import { DEFAULT_SPECIAL_DATES, DEFAULT_WEEKLY_SCHEDULE } from '../utils/scheduleUtils';
 
 export const ASSETS = {
   logoFull: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDk48oJRJB-ScnP0X-F73roM1smdLpcQDpiJVbMty42N5FxaJoiWT-NzAO8oVbAFG-5k-pCYoQygKmBzvZL8QRz3jGgNvRLFjzdBjHBcJlwVT6nXTVa7hQ8kt5Xsnh59IaFOAlUYX2fKUXt3ctA6GAwjw8QuHSrxC-MxRSw5VYJzVWBuiUMb4xaY8KeKXHi3cimgloFqJ0chmc-PXIqHmWLOsuF_GPzA8RkDVKs5JiIFNTd6GnkIaUx_j3csgf_no7wXmc',
@@ -25,8 +26,11 @@ export const DEFAULT_DELIVERY_ZONES: DeliveryZone[] = [
 ];
 
 export const DEFAULT_STORE_CONFIG: StoreConfig = {
-  scheduleText: 'Mar a Dom: 4:30 PM - 11:30 PM',
+  scheduleText: 'Mar a Jue: 4:30 PM - 11:30 PM · Vie y Sáb: 4:30 PM - 12:30 AM · Dom: 4:00 PM - 11:30 PM · Lun: Cerrado',
   isOpen: true,
+  scheduleMode: 'auto',
+  weeklySchedule: DEFAULT_WEEKLY_SCHEDULE,
+  specialDates: DEFAULT_SPECIAL_DATES,
   deliveryTimeEstimate: '25 - 40 min',
   deliveryFee: 5.00,
   freeDeliveryThreshold: 60.00,

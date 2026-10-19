@@ -1,5 +1,13 @@
-import React, { useState, useRef } from 'react';
-import { MenuItem, PortionOption, StoreConfig } from '../types';
+import React, { useState, useRef, useEffect } from 'react';
+import { DaySchedule, MenuItem, PortionOption, SpecialDateSchedule, StoreConfig } from '../types';
+import {
+  DEFAULT_SPECIAL_DATES,
+  DEFAULT_WEEKLY_SCHEDULE,
+  formatDateSpanish,
+  formatTime12h,
+  generateScheduleSummaryText,
+  getStoreStatusInfo,
+} from '../utils/scheduleUtils';
 
 interface AdminConfigModalProps {
   isOpen: boolean;
@@ -51,11 +59,40 @@ export const AdminConfigModal: React.FC<AdminConfigModalProps> = ({
   const [prodPortions, setProdPortions] = useState<PortionOption[]>([]);
 
   // Form states for Store Config
-  const [localStoreConfig, setLocalStoreConfig] = useState<StoreConfig>(storeConfig);
+  const [localStoreConfig, setLocalStoreConfig] = useState<StoreConfig>(() => ({
+    ...storeConfig,
+    weeklySchedule:
+      storeConfig.weeklySchedule && storeConfig.weeklySchedule.length === 7
+        ? storeConfig.weeklySchedule
+        : DEFAULT_WEEKLY_SCHEDULE,
+    specialDates: storeConfig.specialDates || DEFAULT_SPECIAL_DATES,
+    scheduleMode: storeConfig.scheduleMode || 'auto',
+  }));
+
+  // Special Date form states
+  const [newSpecialDate, setNewSpecialDate] = useState<string>('');
+  const [newSpecialNote, setNewSpecialNote] = useState<string>('');
+  const [newSpecialIsClosed, setNewSpecialIsClosed] = useState<boolean>(true);
+  const [newSpecialOpenTime, setNewSpecialOpenTime] = useState<string>('12:00');
+  const [newSpecialCloseTime, setNewSpecialCloseTime] = useState<string>('23:00');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const heroFileInputRef = useRef<HTMLInputElement>(null);
   const jsonImportRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLocalStoreConfig({
+        ...storeConfig,
+        weeklySchedule:
+          storeConfig.weeklySchedule && storeConfig.weeklySchedule.length === 7
+            ? storeConfig.weeklySchedule
+            : DEFAULT_WEEKLY_SCHEDULE,
+        specialDates: storeConfig.specialDates || DEFAULT_SPECIAL_DATES,
+        scheduleMode: storeConfig.scheduleMode || 'auto',
+      });
+    }
+  }, [storeConfig, isOpen]);
 
   if (!isOpen) return null;
 
@@ -218,10 +255,144 @@ export const AdminConfigModal: React.FC<AdminConfigModalProps> = ({
     setLocalStoreConfig({ ...localStoreConfig, deliveryZones: currentZones });
   };
 
+  const handleUpdateDaySchedule = (
+    dayOfWeek: number,
+    field: 'isOpen' | 'openTime' | 'closeTime',
+    value: any
+  ) => {
+    const currentWeekly =
+      localStoreConfig.weeklySchedule && localStoreConfig.weeklySchedule.length === 7
+        ? [...localStoreConfig.weeklySchedule]
+        : [...DEFAULT_WEEKLY_SCHEDULE];
+
+    const updated = currentWeekly.map((d) => {
+      if (d.dayOfWeek === dayOfWeek) {
+        return { ...d, [field]: value };
+      }
+      return d;
+    });
+
+    setLocalStoreConfig((prev) => ({
+      ...prev,
+      weeklySchedule: updated,
+    }));
+  };
+
+  const handleCopyScheduleToAll = (sourceDayOfWeek: number) => {
+    const currentWeekly = localStoreConfig.weeklySchedule || DEFAULT_WEEKLY_SCHEDULE;
+    const source = currentWeekly.find((d) => d.dayOfWeek === sourceDayOfWeek);
+    if (!source) return;
+
+    const updated = currentWeekly.map((d) => ({
+      ...d,
+      openTime: source.openTime,
+      closeTime: source.closeTime,
+    }));
+
+    setLocalStoreConfig((prev) => ({
+      ...prev,
+      weeklySchedule: updated,
+    }));
+    showToast(
+      `¡Horario (${formatTime12h(source.openTime)} - ${formatTime12h(source.closeTime)}) copiado a todos los días!`
+    );
+  };
+
+  const handleApplyPreset = (preset: 'standard' | 'all-open' | 'extended-weekend') => {
+    let updated: DaySchedule[] = [];
+    if (preset === 'standard') {
+      updated = DEFAULT_WEEKLY_SCHEDULE.map((d) => ({
+        ...d,
+        isOpen: d.dayOfWeek !== 1,
+        openTime: '16:30',
+        closeTime: '23:30',
+      }));
+    } else if (preset === 'all-open') {
+      updated = DEFAULT_WEEKLY_SCHEDULE.map((d) => ({
+        ...d,
+        isOpen: true,
+        openTime: '16:30',
+        closeTime: '23:30',
+      }));
+    } else if (preset === 'extended-weekend') {
+      updated = [
+        { dayOfWeek: 1, dayName: 'Lunes', isOpen: false, openTime: '16:30', closeTime: '23:00' },
+        { dayOfWeek: 2, dayName: 'Martes', isOpen: true, openTime: '16:30', closeTime: '23:00' },
+        { dayOfWeek: 3, dayName: 'Miércoles', isOpen: true, openTime: '16:30', closeTime: '23:00' },
+        { dayOfWeek: 4, dayName: 'Jueves', isOpen: true, openTime: '16:30', closeTime: '23:00' },
+        { dayOfWeek: 5, dayName: 'Viernes', isOpen: true, openTime: '16:00', closeTime: '00:30' },
+        { dayOfWeek: 6, dayName: 'Sábado', isOpen: true, openTime: '16:00', closeTime: '00:30' },
+        { dayOfWeek: 0, dayName: 'Domingo', isOpen: true, openTime: '16:00', closeTime: '23:30' },
+      ];
+    }
+
+    const summary = generateScheduleSummaryText(updated);
+    setLocalStoreConfig((prev) => ({
+      ...prev,
+      weeklySchedule: updated,
+      scheduleText: summary,
+    }));
+    showToast('¡Plantilla de horario aplicada correctamente!');
+  };
+
+  const handleAutoGenerateSummary = () => {
+    const weekly = localStoreConfig.weeklySchedule || DEFAULT_WEEKLY_SCHEDULE;
+    const text = generateScheduleSummaryText(weekly);
+    setLocalStoreConfig((prev) => ({ ...prev, scheduleText: text }));
+    showToast('¡Texto de horario sincronizado automáticamente!');
+  };
+
+  const handleAddSpecialDate = () => {
+    if (!newSpecialDate) {
+      alert('Por favor selecciona una fecha en el calendario.');
+      return;
+    }
+    if (!newSpecialNote.trim()) {
+      alert('Por favor ingresa un motivo o nombre para la fecha especial (ej: Feriado).');
+      return;
+    }
+
+    const newEntry: SpecialDateSchedule = {
+      id: `special-${Date.now()}`,
+      date: newSpecialDate,
+      note: newSpecialNote.trim(),
+      isClosed: newSpecialIsClosed,
+      openTime: newSpecialIsClosed ? undefined : newSpecialOpenTime,
+      closeTime: newSpecialIsClosed ? undefined : newSpecialCloseTime,
+    };
+
+    const currentList = localStoreConfig.specialDates || [];
+    const filtered = currentList.filter((s) => s.date !== newSpecialDate);
+
+    setLocalStoreConfig((prev) => ({
+      ...prev,
+      specialDates: [...filtered, newEntry].sort((a, b) => a.date.localeCompare(b.date)),
+    }));
+
+    setNewSpecialDate('');
+    setNewSpecialNote('');
+    setNewSpecialIsClosed(true);
+    showToast('¡Fecha especial agregada exitosamente!');
+  };
+
+  const handleRemoveSpecialDate = (id: string) => {
+    const currentList = localStoreConfig.specialDates || [];
+    setLocalStoreConfig((prev) => ({
+      ...prev,
+      specialDates: currentList.filter((s) => s.id !== id),
+    }));
+    showToast('Fecha especial eliminada.');
+  };
+
   const handleSaveStore = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveStoreConfig(localStoreConfig);
-    showToast('¡Configuración de horario y local guardada con éxito!');
+    const liveStatus = getStoreStatusInfo(localStoreConfig);
+    const updated: StoreConfig = {
+      ...localStoreConfig,
+      isOpen: liveStatus.isOpen,
+    };
+    onSaveStoreConfig(updated);
+    showToast('¡Configuración de horarios y Dark Kitchen guardada con éxito!');
   };
 
   const handleExportJSON = () => {
@@ -723,54 +894,491 @@ export const AdminConfigModal: React.FC<AdminConfigModalProps> = ({
 
           {/* TAB 2: HORARIO & DARK KITCHEN */}
           {activeTab === 'store' && (
-            <form onSubmit={handleSaveStore} className="max-w-2xl mx-auto flex flex-col gap-5">
-              <div className="bg-[#F5F2FB] p-5 rounded-3xl border border-[#E4BEBA]/40 flex flex-col gap-4">
-                <h3 className="text-[16px] font-bold text-[#1B1B21] flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#A20513]">schedule</span>
-                  Horarios y Disponibilidad
-                </h3>
+            <form onSubmit={handleSaveStore} className="max-w-3xl mx-auto flex flex-col gap-6">
+              {/* Bloque 1: Estado y Modo de Operación en Tiempo Real */}
+              <div className="bg-[#F5F2FB] p-5 sm:p-6 rounded-3xl border border-[#E4BEBA]/40 flex flex-col gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-[16px] font-black text-[#1B1B21] flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#A20513]">schedule</span>
+                    Horarios y Control de Disponibilidad
+                  </h3>
 
-                <div className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-[#E4BEBA]/30">
-                  <div>
-                    <span className="text-[13px] font-bold text-[#1B1B21] block">
-                      Estado de la Cocina en Vivo:
-                    </span>
-                    <span className="text-[11px] text-[#5B403D]">
-                      {localStoreConfig.isOpen
-                        ? 'Actualmente visible como "Abierto Ahora" (Aceptando pedidos)'
-                        : 'Actualmente visible como "Cerrado" (Fuera de horario)'}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setLocalStoreConfig((prev) => ({ ...prev, isOpen: !prev.isOpen }))}
-                    className={`px-4 py-2 rounded-full font-extrabold text-[12px] transition-colors cursor-pointer flex items-center gap-1.5 ${
-                      localStoreConfig.isOpen
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-red-600 text-white'
-                    }`}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full bg-white"></span>
-                    {localStoreConfig.isOpen ? 'ABIERTO' : 'CERRADO'}
-                  </button>
+                  {/* Estado en tiempo real calculado */}
+                  {(() => {
+                    const live = getStoreStatusInfo(localStoreConfig);
+                    return (
+                      <div
+                        className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[12px] font-black border ${
+                          live.isOpen
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                            : 'bg-red-50 text-red-800 border-red-300'
+                        }`}
+                      >
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            live.isOpen ? 'bg-emerald-600 animate-pulse' : 'bg-red-600'
+                          }`}
+                        ></span>
+                        <span>{live.statusBadge}</span>
+                        <span className="text-gray-400 font-normal">({live.statusDetail})</span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
-                <div>
-                  <label className="block text-[12px] font-bold text-[#1B1B21] mb-1">
-                    Texto del Horario de Atención:
+                {/* Selector de Modo de Horario */}
+                <div className="bg-white p-4 rounded-2xl border border-[#E4BEBA]/40 flex flex-col gap-3">
+                  <label className="text-[12px] font-bold text-[#1B1B21] block">
+                    Modo de Funcionamiento de la Tienda:
                   </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLocalStoreConfig((prev) => ({ ...prev, scheduleMode: 'auto' }))
+                      }
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1 ${
+                        (localStoreConfig.scheduleMode || 'auto') === 'auto'
+                          ? 'border-[#A20513] bg-[#FFE9E6]/40 text-[#A20513] ring-1 ring-[#A20513]'
+                          : 'border-gray-200 hover:border-gray-300 bg-[#FAF7FD] text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-[12px]">
+                        <span className="material-symbols-outlined text-[17px]">timelapse</span>
+                        Automático (Recomendado)
+                      </div>
+                      <span className="text-[10px] text-gray-500 leading-tight">
+                        Abre y cierra automáticamente según el día, horas y fechas configuradas.
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLocalStoreConfig((prev) => ({ ...prev, scheduleMode: 'manual_open' }))
+                      }
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1 ${
+                        localStoreConfig.scheduleMode === 'manual_open'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-800 ring-1 ring-emerald-600'
+                          : 'border-gray-200 hover:border-gray-300 bg-[#FAF7FD] text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-[12px]">
+                        <span className="material-symbols-outlined text-[17px] text-emerald-600">
+                          check_circle
+                        </span>
+                        Forzar Abierto Ahora
+                      </div>
+                      <span className="text-[10px] text-gray-500 leading-tight">
+                        Muestra siempre abierto recibiendo pedidos sin importar la hora.
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLocalStoreConfig((prev) => ({ ...prev, scheduleMode: 'manual_closed' }))
+                      }
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1 ${
+                        localStoreConfig.scheduleMode === 'manual_closed'
+                          ? 'border-red-600 bg-red-50 text-red-800 ring-1 ring-red-600'
+                          : 'border-gray-200 hover:border-gray-300 bg-[#FAF7FD] text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-[12px]">
+                        <span className="material-symbols-outlined text-[17px] text-red-600">
+                          block
+                        </span>
+                        Forzar Cerrado Ahora
+                      </div>
+                      <span className="text-[10px] text-gray-500 leading-tight">
+                        Cierra la tienda de inmediato (ej. inventario o cocina saturada).
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bloque 2: Horario Semanal Independiente (Por Día y Selector de Hora) */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E4BEBA]/40 flex flex-col gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                    <div>
+                      <h4 className="text-[14px] font-black text-[#1B1B21] flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[#6C45C0] text-[18px]">
+                          calendar_view_week
+                        </span>
+                        Horario Independiente por Día de la Semana
+                      </h4>
+                      <p className="text-[11px] text-[#5B403D]">
+                        Usa los selectores de hora independientes para cada día o márcalo como día de descanso.
+                      </p>
+                    </div>
+
+                    {/* Botones de presets rápidos */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleApplyPreset('standard')}
+                        className="text-[10px] font-bold bg-[#F5F2FB] hover:bg-[#EADDFF] text-[#6C45C0] px-2.5 py-1 rounded-full cursor-pointer transition-colors"
+                      >
+                        Mar a Dom (Lun Descanso)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyPreset('extended-weekend')}
+                        className="text-[10px] font-bold bg-[#F5F2FB] hover:bg-[#EADDFF] text-[#6C45C0] px-2.5 py-1 rounded-full cursor-pointer transition-colors"
+                      >
+                        Fines de Semana Extendidos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApplyPreset('all-open')}
+                        className="text-[10px] font-bold bg-[#F5F2FB] hover:bg-[#EADDFF] text-[#6C45C0] px-2.5 py-1 rounded-full cursor-pointer transition-colors"
+                      >
+                        Todos los Días
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Lista de 7 Días con Selectores de Hora */}
+                  <div className="flex flex-col gap-2.5">
+                    {(() => {
+                      const weekly =
+                        localStoreConfig.weeklySchedule &&
+                        localStoreConfig.weeklySchedule.length === 7
+                          ? localStoreConfig.weeklySchedule
+                          : DEFAULT_WEEKLY_SCHEDULE;
+
+                      // Ordenar Lunes a Domingo
+                      const sorted = [...weekly].sort((a, b) => {
+                        const orderA = a.dayOfWeek === 0 ? 7 : a.dayOfWeek;
+                        const orderB = b.dayOfWeek === 0 ? 7 : b.dayOfWeek;
+                        return orderA - orderB;
+                      });
+
+                      const todayIdx = new Date().getDay();
+
+                      return sorted.map((day) => {
+                        const isToday = day.dayOfWeek === todayIdx;
+                        return (
+                          <div
+                            key={day.dayOfWeek}
+                            className={`p-3 rounded-xl border transition-all ${
+                              isToday
+                                ? 'bg-[#FFF8F7] border-[#A20513]/40 shadow-xs'
+                                : 'bg-[#FAF7FD] border-gray-200'
+                            }`}
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              {/* Nombre del Día */}
+                              <div className="flex items-center gap-2 w-32 shrink-0">
+                                <span className="font-extrabold text-[13px] text-[#1B1B21]">
+                                  {day.dayName}
+                                </span>
+                                {isToday && (
+                                  <span className="bg-[#A20513] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                                    HOY
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Toggle Abierto / Cerrado */}
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateDaySchedule(day.dayOfWeek, 'isOpen', !day.isOpen)
+                                  }
+                                  className={`px-3 py-1 rounded-full font-bold text-[11px] cursor-pointer transition-colors flex items-center gap-1.5 ${
+                                    day.isOpen
+                                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                      : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+                                  }`}
+                                >
+                                  <span
+                                    className={`w-2 h-2 rounded-full ${
+                                      day.isOpen ? 'bg-white' : 'bg-gray-500'
+                                    }`}
+                                  ></span>
+                                  {day.isOpen ? 'ABIERTO' : 'CERRADO'}
+                                </button>
+                              </div>
+
+                              {/* Selectores de Hora Si está Abierto */}
+                              {day.isOpen ? (
+                                <div className="flex flex-wrap items-center gap-2 ml-auto">
+                                  {/* Hora Apertura */}
+                                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-[#E4BEBA]">
+                                    <span className="text-[10px] font-bold text-[#5B403D]">
+                                      Abre:
+                                    </span>
+                                    <input
+                                      type="time"
+                                      value={day.openTime}
+                                      onChange={(e) =>
+                                        handleUpdateDaySchedule(
+                                          day.dayOfWeek,
+                                          'openTime',
+                                          e.target.value
+                                        )
+                                      }
+                                      className="text-[12px] font-black text-[#1B1B21] focus:outline-none bg-transparent cursor-pointer"
+                                      title={`Hora de apertura para ${day.dayName}`}
+                                    />
+                                  </div>
+
+                                  <span className="text-[#8F706C] text-[11px] font-bold">→</span>
+
+                                  {/* Hora Cierre */}
+                                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-[#E4BEBA]">
+                                    <span className="text-[10px] font-bold text-[#5B403D]">
+                                      Cierra:
+                                    </span>
+                                    <input
+                                      type="time"
+                                      value={day.closeTime}
+                                      onChange={(e) =>
+                                        handleUpdateDaySchedule(
+                                          day.dayOfWeek,
+                                          'closeTime',
+                                          e.target.value
+                                        )
+                                      }
+                                      className="text-[12px] font-black text-[#1B1B21] focus:outline-none bg-transparent cursor-pointer"
+                                      title={`Hora de cierre para ${day.dayName}`}
+                                    />
+                                  </div>
+
+                                  {/* Vista 12h */}
+                                  <span className="text-[11px] font-semibold text-purple-900 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                                    {formatTime12h(day.openTime)} - {formatTime12h(day.closeTime)}
+                                  </span>
+
+                                  {/* Botón copiar a todos */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyScheduleToAll(day.dayOfWeek)}
+                                    className="p-1 text-gray-500 hover:text-[#6C45C0] hover:bg-white rounded-md cursor-pointer transition-colors"
+                                    title={`Copiar este horario (${formatTime12h(day.openTime)} - ${formatTime12h(day.closeTime)}) a todos los días`}
+                                  >
+                                    <span className="material-symbols-outlined text-[17px]">
+                                      content_copy
+                                    </span>
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="ml-auto text-[11px] font-bold text-red-600 bg-red-50 px-3 py-1 rounded-md border border-red-200">
+                                  Día de descanso (Sin atención de cocina)
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* Bloque 3: Selector de Fechas Especiales y Feriados (Calendario & Hora) */}
+                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E4BEBA]/40 flex flex-col gap-4">
+                  <div className="border-b border-gray-100 pb-3">
+                    <h4 className="text-[14px] font-black text-[#1B1B21] flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-[#A20513] text-[18px]">
+                        event_available
+                      </span>
+                      Fechas Especiales y Feriados (Selector de Fecha y Hora)
+                    </h4>
+                    <p className="text-[11px] text-[#5B403D]">
+                      Configura días específicos en el calendario para feriados, aniversarios o eventos con horario propio o cierre total.
+                    </p>
+                  </div>
+
+                  {/* Formulario para agregar nueva fecha especial */}
+                  <div className="bg-[#F5F2FB] p-3.5 rounded-2xl border border-[#E4BEBA]/30 flex flex-col gap-3">
+                    <span className="text-[12px] font-bold text-[#1B1B21]">
+                      + Programar Nueva Fecha Especial / Feriado:
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Selector de Fecha */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#5B403D] mb-1">
+                          1. Selector de Fecha:
+                        </label>
+                        <input
+                          type="date"
+                          value={newSpecialDate}
+                          onChange={(e) => setNewSpecialDate(e.target.value)}
+                          className="w-full bg-white text-[12px] font-bold p-2 rounded-xl border border-[#E4BEBA] focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Motivo o Nombre */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#5B403D] mb-1">
+                          2. Motivo o Nombre del Evento:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Feriado 28 de Julio, Día de la Madre..."
+                          value={newSpecialNote}
+                          onChange={(e) => setNewSpecialNote(e.target.value)}
+                          className="w-full bg-white text-[12px] p-2 rounded-xl border border-[#E4BEBA] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Modalidad de la Fecha */}
+                    <div className="flex flex-wrap items-center gap-4 pt-1">
+                      <label className="inline-flex items-center gap-2 cursor-pointer text-[12px] font-medium text-[#1B1B21]">
+                        <input
+                          type="radio"
+                          name="specialType"
+                          checked={newSpecialIsClosed}
+                          onChange={() => setNewSpecialIsClosed(true)}
+                          className="accent-[#A20513]"
+                        />
+                        <span>Cerrado todo el día (Descanso)</span>
+                      </label>
+
+                      <label className="inline-flex items-center gap-2 cursor-pointer text-[12px] font-medium text-[#1B1B21]">
+                        <input
+                          type="radio"
+                          name="specialType"
+                          checked={!newSpecialIsClosed}
+                          onChange={() => setNewSpecialIsClosed(false)}
+                          className="accent-[#A20513]"
+                        />
+                        <span>Horario Especial para esta fecha</span>
+                      </label>
+                    </div>
+
+                    {/* Si tiene Horario Especial: Selectores de Hora */}
+                    {!newSpecialIsClosed && (
+                      <div className="flex flex-wrap items-center gap-3 bg-white p-2.5 rounded-xl border border-[#E4BEBA]/40">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-bold text-[#5B403D]">
+                            Hora Apertura:
+                          </span>
+                          <input
+                            type="time"
+                            value={newSpecialOpenTime}
+                            onChange={(e) => setNewSpecialOpenTime(e.target.value)}
+                            className="bg-[#F5F2FB] px-2 py-1 rounded-lg border border-[#E4BEBA] text-[12px] font-bold"
+                          />
+                        </div>
+
+                        <span className="text-gray-400">→</span>
+
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-bold text-[#5B403D]">Hora Cierre:</span>
+                          <input
+                            type="time"
+                            value={newSpecialCloseTime}
+                            onChange={(e) => setNewSpecialCloseTime(e.target.value)}
+                            className="bg-[#F5F2FB] px-2 py-1 rounded-lg border border-[#E4BEBA] text-[12px] font-bold"
+                          />
+                        </div>
+
+                        <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md">
+                          {formatTime12h(newSpecialOpenTime)} - {formatTime12h(newSpecialCloseTime)}
+                        </span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleAddSpecialDate}
+                      className="bg-[#6C45C0] hover:bg-[#5833AA] text-white py-2 px-4 rounded-xl font-bold text-[12px] flex items-center justify-center gap-1.5 cursor-pointer transition-colors self-start shadow-2xs"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add</span>
+                      Guardar Fecha Especial en el Calendario
+                    </button>
+                  </div>
+
+                  {/* Lista de Fechas Especiales Guardadas */}
+                  <div className="flex flex-col gap-2">
+                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                      Fechas Especiales Configuradas:
+                    </span>
+                    {(localStoreConfig.specialDates || []).length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">
+                        No hay fechas especiales adicionales programadas.
+                      </p>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {(localStoreConfig.specialDates || []).map((sd) => (
+                          <div
+                            key={sd.id}
+                            className="flex items-center justify-between bg-[#FAF7FD] p-2.5 rounded-xl border border-[#E4BEBA]/30 text-[12px]"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-[#1B1B21]">
+                                {formatDateSpanish(sd.date)}
+                              </span>
+                              <span className="text-gray-400">·</span>
+                              <span className="text-[#5B403D]">{sd.note}</span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {sd.isClosed ? (
+                                <span className="bg-red-100 text-red-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                                  Cerrado todo el día
+                                </span>
+                              ) : (
+                                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                                  {formatTime12h(sd.openTime || '')} -{' '}
+                                  {formatTime12h(sd.closeTime || '')}
+                                </span>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSpecialDate(sd.id)}
+                                className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 cursor-pointer transition-colors"
+                                title="Eliminar fecha especial"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">
+                                  delete
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bloque 4: Texto Resumen para Clientes y Web */}
+                <div className="bg-white p-4 rounded-2xl border border-[#E4BEBA]/40 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[12px] font-bold text-[#1B1B21]">
+                      Texto Resumen Visible en la Web:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAutoGenerateSummary}
+                      className="text-[11px] font-bold text-[#6C45C0] hover:text-[#5833AA] flex items-center gap-1 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">sync</span>
+                      Auto-generar desde horario
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={localStoreConfig.scheduleText}
                     onChange={(e) =>
                       setLocalStoreConfig({ ...localStoreConfig, scheduleText: e.target.value })
                     }
-                    placeholder="Ej: Mar a Dom: 4:30 PM - 11:30 PM"
-                    className="w-full bg-white text-[13px] p-2.5 rounded-xl border border-[#E4BEBA]"
+                    placeholder="Ej: Mar a Jue: 4:30 PM - 11:30 PM · Vie y Sáb: 4:30 PM - 12:30 AM · Dom: 4:00 PM - 11:30 PM · Lun: Cerrado"
+                    className="w-full bg-[#FAF7FD] text-[12px] p-2.5 rounded-xl border border-[#E4BEBA]"
                   />
+                  <span className="text-[10px] text-gray-400">
+                    Este texto aparece en la barra superior y en el pie de página para tus clientes.
+                  </span>
                 </div>
 
+                {/* Tiempos de Entrega y Delivery Gratis */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[12px] font-bold text-[#1B1B21] mb-1">
@@ -818,7 +1426,9 @@ export const AdminConfigModal: React.FC<AdminConfigModalProps> = ({
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-[13px] font-bold text-[#1B1B21] flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[17px] text-[#A20513]">local_shipping</span>
+                        <span className="material-symbols-outlined text-[17px] text-[#A20513]">
+                          local_shipping
+                        </span>
                         Zonas y Distritos de Reparto (Tarifas Dinámicas)
                       </h4>
                       <p className="text-[11px] text-[#5B403D]">
