@@ -367,10 +367,10 @@ export const OrderTray: React.FC<OrderTrayProps> = ({
           <div className="flex items-center justify-between text-[11px]">
             <span className="font-bold text-[#1B1B21] flex items-center gap-1">
               <span className="material-symbols-outlined text-[16px] text-emerald-600">verified</span>
-              Medios de Pago Disponibles
+              Pago seguro con Culqi
             </span>
             <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">
-              Yape · Plin · POS · Efectivo
+              {total <= 2000 ? 'Tarjeta · Yape' : 'Tarjeta'}
             </span>
           </div>
         </div>
