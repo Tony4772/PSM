@@ -1,0 +1,7 @@
+{
+  "name": "Piqueos San Miguel | Dark Kitchen & Delivery",
+  "description": "Carta digital y seguimiento en vivo de tequeños artesanales y piqueos criollos fritos al momento en San Miguel, Lima.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
